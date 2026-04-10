@@ -24,7 +24,8 @@
   </script>
   <style>
     * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
-    body { overscroll-behavior: none; background: #1a1a1a; }
+    body { overscroll-behavior: none; background: #fdf6ee; }
+    .dark body { background: #1a1a1a; }
     @keyframes pop    { 0%{transform:scale(0.7)} 60%{transform:scale(1.22)} 100%{transform:scale(1)} }
     @keyframes fadeUp { 0%{opacity:0;transform:translateY(10px)} 100%{opacity:1;transform:translateY(0)} }
     .animate-pop    { animation: pop    0.28s cubic-bezier(.36,.07,.19,.97); }
@@ -35,7 +36,7 @@
     .dark input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(0.8); }
   </style>
 </head>
-<body class="bg-[#1a1a1a]">
+<body class="bg-[#fdf6ee] dark:bg-[#1a1a1a]">
   <div id="root"></div>
 
   <!-- Dependencies -->
@@ -58,8 +59,14 @@
       : null
 
     // ── Colors ─────────────────────────────────────────────────────────────────
-    const COLORS = ['#39ff14','#00ff88','#57ff2e','#80ff00','#00ffaa','#aaff00','#22ff66','#44ff33','#66ff00','#00ff66']
-    const col = (i) => COLORS[i % COLORS.length]
+    const DARK_COLORS  = ['#39ff14','#00ff88','#57ff2e','#80ff00','#00ffaa','#aaff00','#22ff66','#44ff33','#66ff00','#00ff66']
+    const LIGHT_COLORS = ['#f9a8d4','#f472b6','#fbcfe8','#ec4899','#fda4af','#f9a8d4','#f472b6','#fbcfe8','#fda4af','#ec4899']
+    const isDark = () => document.documentElement.classList.contains('dark')
+    // col() reads dark mode at call time — always returns correct colour on re-render
+    const col = (i, darkOverride) => {
+      const dark = darkOverride !== undefined ? darkOverride : isDark()
+      return (dark ? DARK_COLORS : LIGHT_COLORS)[i % 10]
+    }
 
     // ── Streak helpers (pure, work on local data) ──────────────────────────────
     function curStreak(habit, completions, today) {
@@ -252,22 +259,22 @@
     // ── SetupPage ──────────────────────────────────────────────────────────────
     function SetupPage() {
       return (
-        <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center p-6">
+        <div className="min-h-screen bg-[#fdf6ee] dark:bg-[#1a1a1a] flex items-center justify-center p-6">
           <div className="w-full max-w-md animate-fadeUp">
-            <div className="bg-[#242424] rounded-2xl border border-white/[0.07] p-8 space-y-5">
+            <div className="bg-white dark:bg-[#242424] rounded-2xl border border-pink-100 dark:border-white/[0.07] p-8 space-y-5">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-xl">⚙️</div>
                 <div>
-                  <h2 className="font-bold text-white">Setup required</h2>
-                  <p className="text-xs text-gray-500 dark:text-gray-500">Supabase credentials not configured</p>
+                  <h2 className="font-bold text-gray-900 dark:text-white">Setup required</h2>
+                  <p className="text-xs text-gray-500 dark:text-gray-500 dark:text-gray-500 dark:text-gray-500">Supabase credentials not configured</p>
                 </div>
               </div>
-              <ol className="space-y-3 text-sm text-gray-400">
-                <li className="flex gap-3"><span className="w-5 h-5 rounded-full bg-[#39ff14] text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">1</span><span>Create a free project at <strong className="text-white">supabase.com</strong></span></li>
-                <li className="flex gap-3"><span className="w-5 h-5 rounded-full bg-[#39ff14] text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">2</span><span>Run the SQL in <code className="bg-gray-100 dark:bg-white/10 px-1 rounded">supabase-schema.sql</code> in the SQL editor</span></li>
-                <li className="flex gap-3"><span className="w-5 h-5 rounded-full bg-[#39ff14] text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">3</span><span>Copy your Project URL &amp; anon key from <strong className="text-white">Settings → API</strong></span></li>
-                <li className="flex gap-3"><span className="w-5 h-5 rounded-full bg-[#39ff14] text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">4</span><span>Paste them into <code className="bg-gray-100 dark:bg-white/10 px-1 rounded">config.js</code> next to this file</span></li>
-                <li className="flex gap-3"><span className="w-5 h-5 rounded-full bg-[#39ff14] text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">5</span><span>Reload this page</span></li>
+              <ol className="space-y-3 text-sm text-gray-500 dark:text-gray-400">
+                <li className="flex gap-3"><span className="w-5 h-5 rounded-full bg-pink-300 dark:bg-[#39ff14] text-gray-900 dark:text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">1</span><span>Create a free project at <strong className="text-gray-900 dark:text-white">supabase.com</strong></span></li>
+                <li className="flex gap-3"><span className="w-5 h-5 rounded-full bg-pink-300 dark:bg-[#39ff14] text-gray-900 dark:text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">2</span><span>Run the SQL in <code className="bg-gray-100 dark:bg-white/10 px-1 rounded">supabase-schema.sql</code> in the SQL editor</span></li>
+                <li className="flex gap-3"><span className="w-5 h-5 rounded-full bg-pink-300 dark:bg-[#39ff14] text-gray-900 dark:text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">3</span><span>Copy your Project URL &amp; anon key from <strong className="text-gray-900 dark:text-white">Settings → API</strong></span></li>
+                <li className="flex gap-3"><span className="w-5 h-5 rounded-full bg-pink-300 dark:bg-[#39ff14] text-gray-900 dark:text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">4</span><span>Paste them into <code className="bg-gray-100 dark:bg-white/10 px-1 rounded">config.js</code> next to this file</span></li>
+                <li className="flex gap-3"><span className="w-5 h-5 rounded-full bg-pink-300 dark:bg-[#39ff14] text-gray-900 dark:text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">5</span><span>Reload this page</span></li>
               </ol>
             </div>
           </div>
@@ -300,40 +307,40 @@
 
       if (done) {
         return (
-          <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center p-6">
-            <div className="w-full max-w-sm bg-[#242424] rounded-2xl border border-white/[0.07] p-8 text-center space-y-4 animate-fadeUp">
+          <div className="min-h-screen bg-[#fdf6ee] dark:bg-[#1a1a1a] flex items-center justify-center p-6">
+            <div className="w-full max-w-sm bg-white dark:bg-[#242424] rounded-2xl border border-pink-100 dark:border-white/[0.07] p-8 text-center space-y-4 animate-fadeUp">
               <div className="text-4xl">✉️</div>
-              <h2 className="font-bold text-white">Check your email</h2>
-              <p className="text-sm text-gray-400">We sent a confirmation link to <strong className="text-gray-300">{email}</strong>. Click it to activate your account, then sign in.</p>
+              <h2 className="font-bold text-gray-900 dark:text-white">Check your email</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">We sent a confirmation link to <strong className="text-gray-600 dark:text-gray-300">{email}</strong>. Click it to activate your account, then sign in.</p>
               <button onClick={() => { setDone(false); setMode('signin') }}
-                className="text-[#39ff14] text-sm font-medium hover:underline">Back to sign in</button>
+                className="text-pink-400 dark:text-[#39ff14] text-sm font-medium hover:underline">Back to sign in</button>
             </div>
           </div>
         )
       }
 
       return (
-        <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center p-6">
+        <div className="min-h-screen bg-[#fdf6ee] dark:bg-[#1a1a1a] flex items-center justify-center p-6">
           <div className="w-full max-w-sm animate-fadeUp">
             {/* Logo */}
             <div className="flex flex-col items-center mb-8">
-              <div className="w-14 h-14 rounded-2xl bg-[#39ff14] flex items-center justify-center shadow-lg shadow-indigo-500/25 mb-4">
-                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-14 h-14 rounded-2xl bg-pink-300 dark:bg-[#39ff14] flex items-center justify-center shadow-lg shadow-indigo-500/25 mb-4">
+                <svg className="w-7 h-7 text-gray-900 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h1 className="text-xl font-bold text-white">Habit Tracker</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">Habit Tracker</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-500 dark:text-gray-500 dark:text-gray-500 mt-1">
                 {mode === 'signin' ? 'Sign in to your account' : 'Create your account'}
               </p>
             </div>
 
-            <div className="bg-[#242424] rounded-2xl border border-white/[0.07] p-6 space-y-4">
+            <div className="bg-white dark:bg-[#242424] rounded-2xl border border-pink-100 dark:border-white/[0.07] p-6 space-y-4">
               {/* Mode toggle */}
-              <div className="flex rounded-xl overflow-hidden bg-white/[0.06] p-0.5">
+              <div className="flex rounded-xl overflow-hidden bg-pink-50 dark:bg-white/[0.06] p-0.5">
                 {[['signin','Sign in'],['signup','Create account']].map(([m,label]) => (
                   <button key={m} onClick={() => { setMode(m); setError(null) }}
-                    className={`flex-1 py-2 text-xs font-semibold rounded-[10px] transition-all ${mode===m ? 'bg-white dark:bg-[#28282f] text-white shadow-sm' : 'text-gray-500 dark:text-gray-500'}`}>
+                    className={`flex-1 py-2 text-xs font-semibold rounded-[10px] transition-all ${mode===m ? 'bg-white dark:bg-[#28282f] text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-500 dark:text-gray-500 dark:text-gray-500'}`}>
                     {label}
                   </button>
                 ))}
@@ -341,16 +348,16 @@
 
               <form onSubmit={submit} className="space-y-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Email</label>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Email</label>
                   <input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoFocus
                     placeholder="you@example.com"
-                    className="w-full rounded-xl border border-white/[0.08] bg-white/[0.05] text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#39ff14] placeholder-gray-400 dark:placeholder-gray-600" />
+                    className="w-full rounded-xl border border-pink-200 dark:border-white/[0.08] bg-pink-50 dark:bg-white/[0.05] text-gray-900 dark:text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-[#39ff14] placeholder-gray-400 dark:placeholder-gray-600" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Password</label>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Password</label>
                   <input type="password" value={pass} onChange={e=>setPass(e.target.value)} required
                     placeholder="••••••••" minLength={6}
-                    className="w-full rounded-xl border border-white/[0.08] bg-white/[0.05] text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#39ff14] placeholder-gray-400 dark:placeholder-gray-600" />
+                    className="w-full rounded-xl border border-pink-200 dark:border-white/[0.08] bg-pink-50 dark:bg-white/[0.05] text-gray-900 dark:text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-[#39ff14] placeholder-gray-400 dark:placeholder-gray-600" />
                 </div>
 
                 {error && (
@@ -360,7 +367,7 @@
                 )}
 
                 <button type="submit" disabled={busy || !email.trim() || !pass.trim()}
-                  className="w-full py-2.5 rounded-xl bg-[#39ff14] text-white text-sm font-semibold hover:bg-indigo-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
+                  className="w-full py-2.5 rounded-xl bg-pink-300 dark:bg-[#39ff14] text-gray-900 dark:text-white text-sm font-semibold hover:bg-pink-400 dark:hover:bg-[#2ee60f] disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
                   {busy && (
                     <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
@@ -372,9 +379,9 @@
               </form>
 
               {mode === 'signin' && (
-                <p className="text-center text-xs text-gray-500">
+                <p className="text-center text-xs text-gray-500 dark:text-gray-500">
                   No account?{' '}
-                  <button onClick={() => { setMode('signup'); setError(null) }} className="text-[#39ff14] font-medium hover:underline">
+                  <button onClick={() => { setMode('signup'); setError(null) }} className="text-pink-400 dark:text-[#39ff14] font-medium hover:underline">
                     Create one free
                   </button>
                 </p>
@@ -400,33 +407,33 @@
 
       return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={e => e.target===e.currentTarget && onClose()}>
-          <div className="w-full max-w-md bg-[#242424] rounded-2xl shadow-2xl p-6 space-y-4 border border-white/[0.07] animate-fadeUp">
+          <div className="w-full max-w-md bg-white dark:bg-[#242424] rounded-2xl shadow-2xl p-6 space-y-4 border border-pink-100 dark:border-white/[0.07] animate-fadeUp">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-white">{habit ? 'Edit Habit' : 'New Habit'}</h2>
-              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5 text-gray-400 text-xl leading-none">×</button>
+              <h2 className="text-base font-semibold text-gray-900 dark:text-white">{habit ? 'Edit Habit' : 'New Habit'}</h2>
+              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-pink-50 dark:hover:bg-white/5 text-gray-500 dark:text-gray-400 text-xl leading-none">×</button>
             </div>
             <form onSubmit={submit} className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Name</label>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Name</label>
                 <input type="text" value={form.name} onChange={e=>set('name',e.target.value)}
                   placeholder="e.g., Morning run, Read 20 pages" autoFocus
-                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.05] text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#39ff14] placeholder-gray-400 dark:placeholder-gray-600" />
+                  className="w-full rounded-xl border border-pink-200 dark:border-white/[0.08] bg-pink-50 dark:bg-white/[0.05] text-gray-900 dark:text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-[#39ff14] placeholder-gray-400 dark:placeholder-gray-600" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Description <span className="normal-case text-gray-500">(optional)</span></label>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Description <span className="normal-case text-gray-500 dark:text-gray-500">(optional)</span></label>
                 <textarea value={form.description} onChange={e=>set('description',e.target.value)} rows={2}
                   placeholder="Why does this habit matter?"
-                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.05] text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#39ff14] resize-none placeholder-gray-400 dark:placeholder-gray-600" />
+                  className="w-full rounded-xl border border-pink-200 dark:border-white/[0.08] bg-pink-50 dark:bg-white/[0.05] text-gray-900 dark:text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-[#39ff14] resize-none placeholder-gray-400 dark:placeholder-gray-600" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Daily reminder <span className="normal-case text-gray-500">(optional)</span></label>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Daily reminder <span className="normal-case text-gray-500 dark:text-gray-500">(optional)</span></label>
                 <input type="time" value={form.reminderTime} onChange={e=>set('reminderTime',e.target.value)}
-                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.05] text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#39ff14]" />
+                  className="w-full rounded-xl border border-pink-200 dark:border-white/[0.08] bg-pink-50 dark:bg-white/[0.05] text-gray-900 dark:text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-[#39ff14]" />
               </div>
               <div className="flex gap-3 pt-1">
-                <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-white/[0.08] text-sm font-medium text-gray-400 hover:bg-white/5 transition-colors">Cancel</button>
+                <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-pink-200 dark:border-white/[0.08] text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-pink-50 dark:hover:bg-white/5 transition-colors">Cancel</button>
                 <button type="submit" disabled={busy || !form.name.trim()}
-                  className="flex-1 py-2.5 rounded-xl bg-[#39ff14] text-white text-sm font-semibold hover:bg-indigo-600 disabled:opacity-40 transition-colors flex items-center justify-center gap-2">
+                  className="flex-1 py-2.5 rounded-xl bg-pink-300 dark:bg-[#39ff14] text-gray-900 dark:text-white text-sm font-semibold hover:bg-pink-400 dark:hover:bg-[#2ee60f] disabled:opacity-40 transition-colors flex items-center justify-center gap-2">
                   {busy && <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>}
                   {habit ? 'Save' : 'Add Habit'}
                 </button>
@@ -438,12 +445,12 @@
     }
 
     // ── HabitCard ──────────────────────────────────────────────────────────────
-    function HabitCard({ habit, colorIdx, completed, streak, onToggle }) {
+    function HabitCard({ habit, colorIdx, completed, streak, onToggle, dark }) {
       const [popping, setPopping] = useState(false)
-      const c = col(colorIdx)
+      const c = col(colorIdx, dark)
       const tap = () => { setPopping(true); onToggle(); setTimeout(()=>setPopping(false),320) }
       return (
-        <div className="rounded-2xl border border-white/[0.07] bg-[#242424] overflow-hidden flex items-stretch active:scale-[0.985] transition-transform">
+        <div className="rounded-2xl border border-pink-100 dark:border-white/[0.07] bg-white dark:bg-[#242424] overflow-hidden flex items-stretch active:scale-[0.985] transition-transform">
           <div className="w-[3px] flex-shrink-0 transition-colors duration-300" style={{ backgroundColor: completed ? c : 'transparent' }} />
           <div className="flex-1 p-4 flex items-center gap-3.5">
             <button onClick={tap}
@@ -452,16 +459,16 @@
               {completed && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
             </button>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-white text-sm truncate">{habit.name}</p>
+              <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{habit.name}</p>
               {habit.description
-                ? <p className="text-xs text-gray-500 truncate mt-0.5">{habit.description}</p>
+                ? <p className="text-xs text-gray-500 dark:text-gray-500 truncate mt-0.5">{habit.description}</p>
                 : <p className="text-xs mt-0.5" style={{ color: completed ? c : '#9ca3af' }}>{completed ? 'Done today' : 'Tap to complete'}</p>
               }
             </div>
             <div className="text-right flex-shrink-0">
               {streak.current > 0
-                ? <><div className="font-bold text-base leading-none" style={{ color: c }}>🔥 {streak.current}</div><div className="text-[10px] text-gray-500 mt-0.5">day streak</div></>
-                : <><div className="font-bold text-base leading-none text-gray-200 dark:text-gray-700">—</div><div className="text-[10px] text-gray-500 mt-0.5">no streak</div></>
+                ? <><div className="font-bold text-base leading-none" style={{ color: c }}>🔥 {streak.current}</div><div className="text-[10px] text-gray-500 dark:text-gray-500 mt-0.5">day streak</div></>
+                : <><div className="font-bold text-base leading-none text-gray-200 dark:text-gray-700">—</div><div className="text-[10px] text-gray-500 dark:text-gray-500 mt-0.5">no streak</div></>
               }
             </div>
           </div>
@@ -482,28 +489,28 @@
       return (
         <div className="relative" ref={ref}>
           <button onClick={() => setOpen(o=>!o)}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white dark:bg-white/[0.06] border border-white/[0.08] text-xs font-medium text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.09] transition-colors">
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white dark:bg-pink-50 dark:bg-white/[0.06] border border-pink-200 dark:border-white/[0.08] text-xs font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.09] transition-colors">
             <span>{selectedIds.size===habits.length ? 'All habits' : `${selectedIds.size} / ${habits.length}`}</span>
             <svg className={`w-3.5 h-3.5 transition-transform ${open?'rotate-180':''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>
           </button>
           {open && (
-            <div className="absolute top-full right-0 mt-2 z-30 bg-[#2a2a2a] border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden min-w-48">
-              <div className="flex border-b border-white/[0.05]">
-                <button onClick={onSelectAll} className="flex-1 py-2.5 text-xs font-medium text-[#39ff14] hover:bg-white/5">All</button>
-                <button onClick={onClearAll} className="flex-1 py-2.5 text-xs font-medium text-gray-400 hover:bg-white/5">None</button>
+            <div className="absolute top-full right-0 mt-2 z-30 bg-[#fdf6ee] dark:bg-[#2a2a2a] border border-pink-200 dark:border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden min-w-48">
+              <div className="flex border-b border-pink-100 dark:border-white/[0.05]">
+                <button onClick={onSelectAll} className="flex-1 py-2.5 text-xs font-medium text-pink-400 dark:text-[#39ff14] hover:bg-pink-50 dark:hover:bg-white/5">All</button>
+                <button onClick={onClearAll} className="flex-1 py-2.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:bg-pink-50 dark:hover:bg-white/5">None</button>
               </div>
               <div className="py-1 max-h-52 overflow-y-auto">
                 {habits.map((h,i) => {
                   const checked = selectedIds.has(h.id)
                   return (
-                    <label key={h.id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-white/5">
+                    <label key={h.id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-pink-50 dark:hover:bg-white/5">
                       <div className="w-4 h-4 rounded-[4px] border-2 flex items-center justify-center flex-shrink-0 transition-all"
-                        style={checked ? { backgroundColor:col(i), borderColor:col(i) } : { borderColor:'#d1d5db' }}>
-                        {checked && <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
+                        style={checked ? { backgroundColor:col(i,dark), borderColor:col(i,dark) } : { borderColor:'#d1d5db' }}>
+                        {checked && <svg className="w-2.5 h-2.5 text-gray-900 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
                       </div>
                       <input type="checkbox" checked={checked} onChange={() => onToggle(h.id)} className="sr-only" />
-                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor:col(i) }} />
-                      <span className="text-sm text-gray-300 truncate">{h.name}</span>
+                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor:col(i,dark) }} />
+                      <span className="text-sm text-gray-600 dark:text-gray-300 truncate">{h.name}</span>
                     </label>
                   )
                 })}
@@ -515,7 +522,7 @@
     }
 
     // ── CalendarGrid30 ─────────────────────────────────────────────────────────
-    function CalendarGrid30({ habits, completions, today, selectedHabits }) {
+    function CalendarGrid30({ habits, completions, today, selectedHabits, dark }) {
       const days = useMemo(() => eachDayOfInterval({ start:subDays(today,29), end:today }), [today])
       const CELL=17, GAP=2, LW=120
       const monthSpans = useMemo(() => {
@@ -527,13 +534,13 @@
         })
         return spans
       }, [days])
-      if (!selectedHabits.length) return <p className="text-xs text-gray-400 text-center py-6">Select habits to display.</p>
+      if (!selectedHabits.length) return <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-6">Select habits to display.</p>
       return (
         <div className="overflow-x-auto">
           <div style={{ minWidth: LW+30*(CELL+GAP) }}>
             <div className="flex items-center mb-0.5" style={{ paddingLeft:LW }}>
               {monthSpans.map(({label,count}) => (
-                <div key={label} style={{ width:count*(CELL+GAP)-GAP, marginRight:GAP, fontSize:8, fontWeight:700, color:'#39ff14', letterSpacing:'0.06em', flexShrink:0 }}>{label.toUpperCase()}</div>
+                <div key={label} style={{ width:count*(CELL+GAP)-GAP, marginRight:GAP, fontSize:8, fontWeight:700, color: dark ? '#39ff14' : '#f472b6', letterSpacing:'0.06em', flexShrink:0 }}>{label.toUpperCase()}</div>
               ))}
             </div>
             <div className="flex items-center mb-1" style={{ paddingLeft:LW }}>
@@ -542,12 +549,12 @@
               ))}
             </div>
             {selectedHabits.map(h => {
-              const hi = habits.findIndex(hh=>hh.id===h.id), c=col(hi)
+              const hi = habits.findIndex(hh=>hh.id===h.id), c=col(hi,dark)
               return (
                 <div key={h.id} className="flex items-center" style={{ height:CELL+4, marginBottom:GAP }}>
                   <div style={{ width:LW, paddingRight:8, flexShrink:0 }} className="flex items-center gap-2">
                     <div style={{ width:6, height:6, borderRadius:'50%', backgroundColor:c, flexShrink:0 }} />
-                    <span style={{ fontSize:10.5, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} className="text-gray-500 dark:text-gray-500">{h.name}</span>
+                    <span style={{ fontSize:10.5, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} className="text-gray-500 dark:text-gray-500 dark:text-gray-500 dark:text-gray-500">{h.name}</span>
                   </div>
                   {days.map(d => {
                     const done = !!completions[format(d,'yyyy-MM-dd')]?.[h.id]
@@ -559,7 +566,7 @@
             })}
             <div className="flex items-center" style={{ marginTop:6, paddingTop:6, borderTop:'1px solid rgba(128,128,128,0.12)' }}>
               <div style={{ width:LW, paddingRight:8, flexShrink:0 }}>
-                <span style={{ fontSize:9, fontWeight:700, letterSpacing:'0.08em' }} className="text-gray-500">TOTAL</span>
+                <span style={{ fontSize:9, fontWeight:700, letterSpacing:'0.08em' }} className="text-gray-500 dark:text-gray-500">TOTAL</span>
               </div>
               {days.map(d => {
                 const key = format(d,'yyyy-MM-dd')
@@ -567,8 +574,8 @@
                 const pct = selectedHabits.length ? total/selectedHabits.length : 0
                 return (
                   <div key={key} style={{ width:CELL, height:CELL, marginRight:GAP, flexShrink:0, borderRadius:3, display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700,
-                    backgroundColor: total>0 ? `rgba(57,255,20,${0.18+pct*0.7})` : 'rgba(128,128,128,0.1)',
-                    color: total>0 ? '#39ff14' : '#9ca3af' }}>
+                    backgroundColor: total>0 ? (dark ? `rgba(57,255,20,${0.18+pct*0.7})` : `rgba(244,114,182,${0.18+pct*0.7})`) : 'rgba(128,128,128,0.1)',
+                    color: total>0 ? (dark ? '#39ff14' : '#f472b6') : '#9ca3af' }}>
                     {total>0 ? total : ''}
                   </div>
                 )
@@ -580,7 +587,7 @@
     }
 
     // ── StackedBarChart ────────────────────────────────────────────────────────
-    function StackedBarChart({ habits, completions, today, selectedHabits }) {
+    function StackedBarChart({ habits, completions, today, selectedHabits, dark }) {
       const days = useMemo(() => eachDayOfInterval({ start:subDays(today,29), end:today }), [today])
       const W=700, H=130, PAD={t:8,r:8,b:26,l:26}
       const iW=W-PAD.l-PAD.r, iH=H-PAD.t-PAD.b
@@ -598,7 +605,7 @@
             let stackY=PAD.t+iH, x=PAD.l+di*slot+(slot-barW)/2
             return (
               <g key={key}>
-                {done.map(h => { const hi=habits.findIndex(hh=>hh.id===h.id); stackY-=segH; return <rect key={h.id} x={x} y={stackY+0.5} width={barW} height={segH-1} fill={col(hi)} rx={barW>10?3:2} opacity={0.88}/> })}
+                {done.map(h => { const hi=habits.findIndex(hh=>hh.id===h.id); stackY-=segH; return <rect key={h.id} x={x} y={stackY+0.5} width={barW} height={segH-1} fill={col(hi,dark)} rx={barW>10?3:2} opacity={0.88}/> })}
                 {done.length===0 && <rect x={x} y={PAD.t} width={barW} height={iH} fill="rgba(128,128,128,0.05)" rx={barW>10?3:2}/>}
               </g>
             )
@@ -611,15 +618,15 @@
       )
     }
 
-    function ColorLegend({ habits, selectedIds }) {
+    function ColorLegend({ habits, selectedIds, dark }) {
       const selected = habits.filter(h=>selectedIds.has(h.id))
       if (!selected.length) return null
       return (
         <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-2">
           {selected.map(h => { const hi=habits.findIndex(hh=>hh.id===h.id); return (
             <div key={h.id} className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor:col(hi) }}/>
-              <span className="text-[10px] text-gray-500 dark:text-gray-500 truncate" style={{ maxWidth:80 }}>{h.name}</span>
+              <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor:col(hi,dark) }}/>
+              <span className="text-[10px] text-gray-500 dark:text-gray-500 dark:text-gray-500 dark:text-gray-500 truncate" style={{ maxWidth:80 }}>{h.name}</span>
             </div>
           )})}
         </div>
@@ -627,40 +634,40 @@
     }
 
     // ── TodayPage ──────────────────────────────────────────────────────────────
-    function TodayPage({ habits, streaks, toggleCompletion, isCompleted, today, requestPermission, navigate }) {
+    function TodayPage({ habits, streaks, toggleCompletion, isCompleted, today, requestPermission, navigate, dark }) {
       const wins=habits.filter(h=>isCompleted(h.id)).length, pct=habits.length?Math.round(wins/habits.length*100):0
       return (
         <div className="py-4 space-y-5">
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-2xl font-bold tracking-tight text-white">{format(today,'EEEE')}</h2>
-              <p className="text-sm text-gray-500 mt-0.5">{format(today,'MMMM d, yyyy')}</p>
+              <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{format(today,'EEEE')}</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-500 mt-0.5">{format(today,'MMMM d, yyyy')}</p>
             </div>
             <button onClick={async()=>{ const ok=await requestPermission(); if(!ok) alert('Enable notifications in browser settings.') }}
-              className="p-2.5 rounded-xl hover:bg-white/5 text-gray-400 transition-colors" title="Enable reminders">
+              className="p-2.5 rounded-xl hover:bg-pink-50 dark:hover:bg-white/5 text-gray-500 dark:text-gray-400 transition-colors" title="Enable reminders">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
             </button>
           </div>
           {habits.length>0 && (
             <div>
-              <div className="flex justify-between text-xs mb-1.5 text-gray-500">
+              <div className="flex justify-between text-xs mb-1.5 text-gray-500 dark:text-gray-500">
                 <span>{wins} of {habits.length} completed</span>
                 <span className="font-semibold tabular-nums">{pct}%</span>
               </div>
-              <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all duration-700" style={{ width:`${pct}%`, backgroundColor:'#39ff14' }}/>
+              <div className="h-1 bg-pink-50 dark:bg-white/[0.06] rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all duration-700" style={{ width:`${pct}%`, backgroundColor: dark ? '#39ff14' : '#f9a8d4' }}/>
               </div>
             </div>
           )}
           <div className="space-y-2">
-            {habits.map((h,i) => <HabitCard key={h.id} habit={h} colorIdx={i} completed={isCompleted(h.id)} streak={streaks[h.id]||{current:0}} onToggle={()=>toggleCompletion(h.id)} />)}
+            {habits.map((h,i) => <HabitCard key={h.id} habit={h} colorIdx={i} completed={isCompleted(h.id)} streak={streaks[h.id]||{current:0}} onToggle={()=>toggleCompletion(h.id)} dark={dark} />)}
           </div>
           {habits.length===0 && (
             <div className="flex flex-col items-center py-20 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-[#39ff14]/10 flex items-center justify-center mb-4 text-2xl">🌱</div>
-              <p className="font-semibold text-gray-300">No habits yet</p>
-              <p className="text-sm text-gray-500 mt-1 mb-6">Start tracking your daily habits.</p>
-              <button onClick={()=>navigate('manage')} className="px-5 py-2.5 bg-[#39ff14] text-black rounded-xl text-sm font-semibold hover:bg-[#2ee60f] transition-colors">Add your first habit</button>
+              <div className="w-14 h-14 rounded-2xl bg-pink-300 dark:bg-[#39ff14]/10 flex items-center justify-center mb-4 text-2xl">🌱</div>
+              <p className="font-semibold text-gray-600 dark:text-gray-300">No habits yet</p>
+              <p className="text-sm text-gray-500 dark:text-gray-500 mt-1 mb-6">Start tracking your daily habits.</p>
+              <button onClick={()=>navigate('manage')} className="px-5 py-2.5 bg-pink-300 dark:bg-[#39ff14] text-gray-900 dark:text-black rounded-xl text-sm font-semibold hover:bg-pink-400 dark:hover:bg-[#2ee60f] transition-colors">Add your first habit</button>
             </div>
           )}
         </div>
@@ -668,7 +675,7 @@
     }
 
     // ── AnalyticsPage ──────────────────────────────────────────────────────────
-    function AnalyticsPage({ habits, completions, streaks, today }) {
+    function AnalyticsPage({ habits, completions, streaks, today, dark }) {
       const [selectedIds, setSelectedIds] = useState(() => new Set(habits.map(h=>h.id)))
       useEffect(() => { setSelectedIds(new Set(habits.map(h=>h.id))) }, [habits.length])
       const toggle=id=>setSelectedIds(prev=>{const s=new Set(prev);s.has(id)?s.delete(id):s.add(id);return s})
@@ -677,50 +684,50 @@
       const topStreak=habits.length?Math.max(...habits.map(h=>streaks[h.id]?.longest??0)):0
       if (!habits.length) return (
         <div className="py-4">
-          <h2 className="text-xl font-bold tracking-tight text-white mb-6">Analytics</h2>
-          <div className="text-center py-20 text-gray-400"><div className="text-4xl mb-3">📊</div><p className="font-medium">No data yet</p><p className="text-sm mt-1 text-gray-500">Add habits and start tracking.</p></div>
+          <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white mb-6">Analytics</h2>
+          <div className="text-center py-20 text-gray-500 dark:text-gray-400"><div className="text-4xl mb-3">📊</div><p className="font-medium">No data yet</p><p className="text-sm mt-1 text-gray-500 dark:text-gray-500">Add habits and start tracking.</p></div>
         </div>
       )
       return (
         <div className="py-4 space-y-4">
-          <h2 className="text-xl font-bold tracking-tight text-white">Analytics</h2>
+          <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Analytics</h2>
           <div className="grid grid-cols-3 gap-2.5">
-            {[{label:'Habits',value:habits.length,color:'#39ff14'},{label:'Avg 30d',value:`${avgRate}%`,color:'#10b981'},{label:'Best streak',value:`🔥 ${topStreak}`,color:'#f59e0b'}].map(s=>(
-              <div key={s.label} className="bg-[#242424] rounded-2xl border border-white/[0.07] p-3.5 text-center">
+            {[{label:'Habits',value:habits.length,color: dark ? '#39ff14' : '#f472b6'},{label:'Avg 30d',value:`${avgRate}%`,color: dark ? '#10b981' : '#f472b6'},{label:'Best streak',value:`🔥 ${topStreak}`,color:'#f59e0b'}].map(s=>(
+              <div key={s.label} className="bg-white dark:bg-[#242424] rounded-2xl border border-pink-100 dark:border-white/[0.07] p-3.5 text-center">
                 <div className="text-xl font-bold tabular-nums" style={{ color:s.color }}>{s.value}</div>
-                <div className="text-[10px] text-gray-500 mt-0.5 uppercase tracking-wide">{s.label}</div>
+                <div className="text-[10px] text-gray-500 dark:text-gray-500 mt-0.5 uppercase tracking-wide">{s.label}</div>
               </div>
             ))}
           </div>
-          <div className="bg-[#242424] rounded-2xl border border-white/[0.07] p-5 space-y-5">
+          <div className="bg-white dark:bg-[#242424] rounded-2xl border border-pink-100 dark:border-white/[0.07] p-5 space-y-5">
             <div className="flex items-center justify-between gap-3">
-              <div><h3 className="font-semibold text-white text-sm">30-Day Overview</h3><p className="text-[11px] text-gray-500 mt-0.5">Last 30 days completion grid</p></div>
-              <HabitSelector habits={habits} selectedIds={selectedIds} onToggle={toggle} onSelectAll={()=>setSelectedIds(new Set(habits.map(h=>h.id)))} onClearAll={()=>setSelectedIds(new Set())} />
+              <div><h3 className="font-semibold text-gray-900 dark:text-white text-sm">30-Day Overview</h3><p className="text-[11px] text-gray-500 dark:text-gray-500 mt-0.5">Last 30 days completion grid</p></div>
+              <HabitSelector habits={habits} selectedIds={selectedIds} onToggle={toggle} onSelectAll={()=>setSelectedIds(new Set(habits.map(h=>h.id)))} onClearAll={()=>setSelectedIds(new Set())} dark={dark} />
             </div>
-            <CalendarGrid30 habits={habits} completions={completions} today={today} selectedHabits={selectedHabits} />
-            <div className="border-t border-white/[0.05] pt-4">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Daily stacked completions</h3>
-              <StackedBarChart habits={habits} completions={completions} today={today} selectedHabits={selectedHabits} />
-              <ColorLegend habits={habits} selectedIds={selectedIds} />
+            <CalendarGrid30 habits={habits} completions={completions} today={today} selectedHabits={selectedHabits} dark={dark} />
+            <div className="border-t border-pink-100 dark:border-white/[0.05] pt-4">
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-500 uppercase tracking-wider mb-3">Daily stacked completions</h3>
+              <StackedBarChart habits={habits} completions={completions} today={today} selectedHabits={selectedHabits} dark={dark} />
+              <ColorLegend habits={habits} selectedIds={selectedIds} dark={dark} />
             </div>
           </div>
           <div className="space-y-2">
             {habits.map((h,i)=>{
-              const s=streaks[h.id]||{current:0,longest:0,rate:0}, c=col(i)
+              const s=streaks[h.id]||{current:0,longest:0,rate:0}, c=col(i,dark)
               return (
-                <div key={h.id} className="bg-[#242424] rounded-2xl border border-white/[0.07] p-4 overflow-hidden flex">
+                <div key={h.id} className="bg-white dark:bg-[#242424] rounded-2xl border border-pink-100 dark:border-white/[0.07] p-4 overflow-hidden flex">
                   <div className="w-[3px] flex-shrink-0 rounded-full mr-4" style={{ backgroundColor:c }}/>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="font-semibold text-white text-sm truncate">{h.name}</span>
+                      <span className="font-semibold text-gray-900 dark:text-white text-sm truncate">{h.name}</span>
                       <span className="text-sm font-bold flex-shrink-0 tabular-nums" style={{ color:c }}>🔥 {s.current}d</span>
                     </div>
-                    <div className="flex gap-4 text-xs text-gray-500 mb-2">
-                      <span>Current: <strong className="text-gray-400 tabular-nums">{s.current}d</strong></span>
-                      <span>Best: <strong className="text-gray-400 tabular-nums">{s.longest}d</strong></span>
+                    <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-500 mb-2">
+                      <span>Current: <strong className="text-gray-500 dark:text-gray-400 tabular-nums">{s.current}d</strong></span>
+                      <span>Best: <strong className="text-gray-500 dark:text-gray-400 tabular-nums">{s.longest}d</strong></span>
                       <span>Rate: <strong className="tabular-nums" style={{ color:c }}>{s.rate}%</strong></span>
                     </div>
-                    <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden">
+                    <div className="h-1 bg-pink-50 dark:bg-white/[0.06] rounded-full overflow-hidden">
                       <div className="h-full rounded-full transition-all duration-500" style={{ width:`${s.rate}%`, backgroundColor:c }}/>
                     </div>
                   </div>
@@ -733,46 +740,46 @@
     }
 
     // ── ManagePage ─────────────────────────────────────────────────────────────
-    function ManagePage({ habits, streaks, addHabit, updateHabit, deleteHabit }) {
+    function ManagePage({ habits, streaks, addHabit, updateHabit, deleteHabit, dark }) {
       const [modal, setModal]       = useState(null)
       const [confirmDel, setConfirmDel] = useState(null)
       const save = async (f) => { if(!modal||modal==='new') await addHabit(f); else await updateHabit(modal.id,f); setModal(null) }
       return (
         <div className="py-4 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold tracking-tight text-white">Manage</h2>
-            <button onClick={()=>setModal('new')} className="flex items-center gap-1.5 px-4 py-2 bg-[#39ff14] text-black rounded-xl text-sm font-semibold hover:bg-[#2ee60f] transition-colors">+ New</button>
+            <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Manage</h2>
+            <button onClick={()=>setModal('new')} className="flex items-center gap-1.5 px-4 py-2 bg-pink-300 dark:bg-[#39ff14] text-gray-900 dark:text-black rounded-xl text-sm font-semibold hover:bg-pink-400 dark:hover:bg-[#2ee60f] transition-colors">+ New</button>
           </div>
           {habits.length===0 ? (
-            <div className="text-center py-20 text-gray-400">
+            <div className="text-center py-20 text-gray-500 dark:text-gray-400">
               <div className="text-4xl mb-3">📝</div>
-              <p className="font-medium text-gray-500 dark:text-gray-500">No habits yet</p>
-              <p className="text-sm mt-1 text-gray-500">Tap "+ New" to add one.</p>
+              <p className="font-medium text-gray-500 dark:text-gray-500 dark:text-gray-500 dark:text-gray-500">No habits yet</p>
+              <p className="text-sm mt-1 text-gray-500 dark:text-gray-500">Tap "+ New" to add one.</p>
             </div>
           ) : (
             <div className="space-y-2">
               {habits.map((h,i)=>{
-                const s=streaks[h.id]||{current:0,longest:0,rate:0}, c=col(i)
+                const s=streaks[h.id]||{current:0,longest:0,rate:0}, c=col(i,dark)
                 return (
-                  <div key={h.id} className="bg-[#242424] rounded-2xl border border-white/[0.07] overflow-hidden flex items-stretch">
+                  <div key={h.id} className="bg-white dark:bg-[#242424] rounded-2xl border border-pink-100 dark:border-white/[0.07] overflow-hidden flex items-stretch">
                     <div className="w-[3px] flex-shrink-0" style={{ backgroundColor:c }}/>
                     <div className="flex-1 p-4 flex items-center gap-3">
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-white text-sm truncate">{h.name}</p>
-                        {h.description && <p className="text-xs text-gray-500 truncate mt-0.5">{h.description}</p>}
+                        <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{h.name}</p>
+                        {h.description && <p className="text-xs text-gray-500 dark:text-gray-500 truncate mt-0.5">{h.description}</p>}
                         <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                           <span className="text-xs font-semibold tabular-nums" style={{ color:c }}>🔥 {s.current}d</span>
-                          <span className="text-xs text-gray-500 tabular-nums">Best {s.longest}d</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-500 tabular-nums">Best {s.longest}d</span>
                           <span className="text-xs tabular-nums" style={{ color:c }}>{s.rate}%</span>
-                          {h.reminderTime && <span className="text-xs text-gray-500">⏰ {h.reminderTime}</span>}
+                          {h.reminderTime && <span className="text-xs text-gray-500 dark:text-gray-500">⏰ {h.reminderTime}</span>}
                         </div>
                       </div>
                       <div className="flex gap-1 flex-shrink-0">
-                        <button onClick={()=>setModal(h)} className="w-8 h-8 rounded-lg hover:bg-white/5 flex items-center justify-center transition-colors">
-                          <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        <button onClick={()=>setModal(h)} className="w-8 h-8 rounded-lg hover:bg-pink-50 dark:hover:bg-white/5 flex items-center justify-center transition-colors">
+                          <svg className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                         </button>
                         <button onClick={()=>setConfirmDel(h)} className="w-8 h-8 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 flex items-center justify-center transition-colors">
-                          <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                          <svg className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                         </button>
                       </div>
                     </div>
@@ -784,12 +791,12 @@
           {modal && <AddEditModal habit={modal==='new'?null:modal} onSave={save} onClose={()=>setModal(null)}/>}
           {confirmDel && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-              <div className="w-full max-w-sm bg-[#242424] rounded-2xl border border-white/[0.07] p-6 space-y-4 animate-fadeUp">
-                <h3 className="font-bold text-white">Delete habit?</h3>
-                <p className="text-sm text-gray-400"><strong className="text-gray-300">{confirmDel.name}</strong> and all its history will be permanently deleted.</p>
+              <div className="w-full max-w-sm bg-white dark:bg-[#242424] rounded-2xl border border-pink-100 dark:border-white/[0.07] p-6 space-y-4 animate-fadeUp">
+                <h3 className="font-bold text-gray-900 dark:text-white">Delete habit?</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400"><strong className="text-gray-600 dark:text-gray-300">{confirmDel.name}</strong> and all its history will be permanently deleted.</p>
                 <div className="flex gap-3">
-                  <button onClick={()=>setConfirmDel(null)} className="flex-1 py-2.5 rounded-xl border border-white/[0.08] text-sm font-medium text-gray-400">Cancel</button>
-                  <button onClick={async()=>{await deleteHabit(confirmDel.id);setConfirmDel(null)}} className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600">Delete</button>
+                  <button onClick={()=>setConfirmDel(null)} className="flex-1 py-2.5 rounded-xl border border-pink-200 dark:border-white/[0.08] text-sm font-medium text-gray-500 dark:text-gray-400">Cancel</button>
+                  <button onClick={async()=>{await deleteHabit(confirmDel.id);setConfirmDel(null)}} className="flex-1 py-2.5 rounded-xl bg-red-500 text-gray-900 dark:text-white text-sm font-semibold hover:bg-red-600">Delete</button>
                 </div>
               </div>
             </div>
@@ -801,8 +808,8 @@
     // ── Spinner ────────────────────────────────────────────────────────────────
     function Spinner() {
       return (
-        <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center">
-          <svg className="w-8 h-8 animate-spin text-[#39ff14]" fill="none" viewBox="0 0 24 24">
+        <div className="min-h-screen bg-[#fdf6ee] dark:bg-[#1a1a1a] flex items-center justify-center">
+          <svg className="w-8 h-8 animate-spin text-pink-400 dark:text-[#39ff14]" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
           </svg>
@@ -837,27 +844,27 @@
       ]
 
       return (
-        <div className="min-h-screen bg-[#1a1a1a] transition-colors duration-200">
-          <header className="sticky top-0 z-10 bg-[#1a1a1a]/90 backdrop-blur-xl border-b border-white/[0.05] px-5 py-3.5 flex items-center justify-between">
+        <div className="min-h-screen bg-[#fdf6ee] dark:bg-[#1a1a1a] transition-colors duration-200">
+          <header className="sticky top-0 z-10 bg-[#fdf6ee] dark:bg-[#fdf6ee]/90 dark:bg-[#1a1a1a]/90 backdrop-blur-xl border-b border-pink-100 dark:border-white/[0.05] px-5 py-3.5 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-[#39ff14] flex items-center justify-center">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>
+              <div className="w-7 h-7 rounded-lg bg-pink-300 dark:bg-[#39ff14] flex items-center justify-center">
+                <svg className="w-4 h-4 text-gray-900 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>
               </div>
-              <span className="font-bold text-white tracking-tight">Habit Tracker</span>
+              <span className="font-bold text-gray-900 dark:text-white tracking-tight">Habit Tracker</span>
             </div>
             <div className="flex items-center gap-2">
               {/* User email */}
-              <span className="text-xs text-gray-500 hidden sm:block truncate max-w-32">{user.email}</span>
+              <span className="text-xs text-gray-500 dark:text-gray-500 hidden sm:block truncate max-w-32">{user.email}</span>
               {/* Dark mode */}
-              <button onClick={()=>setDark(d=>!d)} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-white/5 transition-colors">
+              <button onClick={()=>setDark(d=>!d)} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-pink-50 dark:hover:bg-white/5 transition-colors">
                 {dark
-                  ? <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-                  : <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                  ? <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                  : <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
                 }
               </button>
               {/* Sign out */}
               <button onClick={signOut} title="Sign out"
-                className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-white/5 transition-colors text-gray-400">
+                className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-pink-50 dark:hover:bg-white/5 transition-colors text-gray-500 dark:text-gray-400">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
               </button>
             </div>
@@ -866,24 +873,24 @@
           <main className="max-w-xl mx-auto px-4 pb-24">
             {data.dataLoading ? (
               <div className="flex items-center justify-center py-24">
-                <svg className="w-6 h-6 animate-spin text-[#39ff14]" fill="none" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 animate-spin text-pink-400 dark:text-[#39ff14]" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
                 </svg>
               </div>
             ) : (
               <>
-                {page==='today'     && <TodayPage     {...data} requestPermission={requestPermission} navigate={navigate} />}
-                {page==='analytics' && <AnalyticsPage {...data} />}
-                {page==='manage'    && <ManagePage    {...data} />}
+                {page==='today'     && <TodayPage     {...data} requestPermission={requestPermission} navigate={navigate} dark={dark} />}
+                {page==='analytics' && <AnalyticsPage {...data} dark={dark} />}
+                {page==='manage'    && <ManagePage    {...data} dark={dark} />}
               </>
             )}
           </main>
 
-          <nav className="fixed bottom-0 left-0 right-0 z-10 bg-[#1a1a1a]/90 backdrop-blur-xl border-t border-white/[0.05] flex" style={{ paddingBottom:'env(safe-area-inset-bottom,0)' }}>
+          <nav className="fixed bottom-0 left-0 right-0 z-10 bg-[#fdf6ee] dark:bg-[#fdf6ee]/90 dark:bg-[#1a1a1a]/90 backdrop-blur-xl border-t border-pink-100 dark:border-white/[0.05] flex" style={{ paddingBottom:'env(safe-area-inset-bottom,0)' }}>
             {TABS.map(({key,label,icon}) => (
               <button key={key} onClick={()=>navigate(key)}
-                className={`flex-1 py-3.5 flex flex-col items-center gap-1 text-[11px] font-medium transition-colors ${page===key ? 'text-[#39ff14]' : 'text-gray-500'}`}>
+                className={`flex-1 py-3.5 flex flex-col items-center gap-1 text-[11px] font-medium transition-colors ${page===key ? 'text-pink-400 dark:text-[#39ff14]' : 'text-gray-500 dark:text-gray-500'}`}>
                 <div className={`transition-transform ${page===key?'scale-110':''}`}>{icon}</div>
                 {label}
               </button>
