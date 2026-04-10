@@ -12,8 +12,12 @@
         extend: {
           keyframes: {
             pop: { '0%': { transform: 'scale(0.7)' }, '60%': { transform: 'scale(1.22)' }, '100%': { transform: 'scale(1)' } },
+            fadeUp: { '0%': { opacity: '0', transform: 'translateY(10px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
           },
-          animation: { pop: 'pop 0.28s cubic-bezier(.36,.07,.19,.97)' },
+          animation: {
+            pop: 'pop 0.28s cubic-bezier(.36,.07,.19,.97)',
+            fadeUp: 'fadeUp 0.2s ease-out',
+          },
         },
       },
     }
@@ -21,8 +25,10 @@
   <style>
     * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
     body { overscroll-behavior: none; }
-    @keyframes pop { 0% { transform: scale(0.7); } 60% { transform: scale(1.22); } 100% { transform: scale(1); } }
-    .animate-pop { animation: pop 0.28s cubic-bezier(.36,.07,.19,.97); }
+    @keyframes pop    { 0%{transform:scale(0.7)} 60%{transform:scale(1.22)} 100%{transform:scale(1)} }
+    @keyframes fadeUp { 0%{opacity:0;transform:translateY(10px)} 100%{opacity:1;transform:translateY(0)} }
+    .animate-pop    { animation: pop    0.28s cubic-bezier(.36,.07,.19,.97); }
+    .animate-fadeUp { animation: fadeUp 0.2s ease-out; }
     ::-webkit-scrollbar { width: 3px; height: 3px; }
     ::-webkit-scrollbar-thumb { background: #374151; border-radius: 2px; }
     input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(0.5); }
@@ -32,49 +38,35 @@
 <body class="bg-slate-50 dark:bg-[#0d0d12]">
   <div id="root"></div>
 
+  <!-- Dependencies -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/date-fns@3.6.0/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="./config.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <script type="text/babel">
     const { useState, useEffect, useCallback, useMemo, useRef } = React
     const { format, subDays, parseISO, isBefore, startOfDay, eachDayOfInterval } = dateFns
 
+    // ── Supabase client ────────────────────────────────────────────────────────
+    const cfg = window.HABIT_CONFIG || {}
+    const isConfigured = cfg.supabaseUrl && !cfg.supabaseUrl.includes('YOUR_')
+    const sb = isConfigured
+      ? supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey)
+      : null
+
     // ── Colors ─────────────────────────────────────────────────────────────────
-    const COLORS = [
-      '#6366f1','#8b5cf6','#06b6d4','#f59e0b',
-      '#ec4899','#10b981','#f97316','#3b82f6',
-      '#14b8a6','#fb7185',
-    ]
+    const COLORS = ['#6366f1','#8b5cf6','#06b6d4','#f59e0b','#ec4899','#10b981','#f97316','#3b82f6','#14b8a6','#fb7185']
     const col = (i) => COLORS[i % COLORS.length]
-    const colAlpha = (i, a) => {
-      const c = col(i)
-      const r = parseInt(c.slice(1,3),16), g = parseInt(c.slice(3,5),16), b = parseInt(c.slice(5,7),16)
-      return `rgba(${r},${g},${b},${a})`
-    }
 
-    // ── Storage ────────────────────────────────────────────────────────────────
-    const SKEY = 'habit_tracker_v2'
-    const load = () => {
-      try {
-        const raw = localStorage.getItem(SKEY) || localStorage.getItem('habit_tracker_v1')
-        if (!raw) return { habits: [], completions: {} }
-        const d = JSON.parse(raw)
-        // Migrate: strip 'type' field (all habits become good habits)
-        d.habits = (d.habits || []).map(({ type, ...rest }) => rest)
-        return { habits: d.habits || [], completions: d.completions || {} }
-      } catch { return { habits: [], completions: {} } }
-    }
-    const save = (d) => { try { localStorage.setItem(SKEY, JSON.stringify(d)) } catch {} }
-
-    // ── Streak helpers ─────────────────────────────────────────────────────────
+    // ── Streak helpers (pure, work on local data) ──────────────────────────────
     function curStreak(habit, completions, today) {
       const created = startOfDay(parseISO(habit.createdAt))
       let n = 0, d = startOfDay(today)
       while (!isBefore(d, created)) {
-        if (completions[format(d,'yyyy-MM-dd')]?.[habit.id]) { n++; d = subDays(d,1) }
-        else break
+        if (completions[format(d,'yyyy-MM-dd')]?.[habit.id]) { n++; d = subDays(d,1) } else break
       }
       return n
     }
@@ -82,55 +74,147 @@
       const created = startOfDay(parseISO(habit.createdAt))
       let best = 0, cur = 0
       eachDayOfInterval({ start: created, end: today }).forEach(day => {
-        if (completions[format(day,'yyyy-MM-dd')]?.[habit.id]) { cur++; best = Math.max(best,cur) }
-        else cur = 0
+        completions[format(day,'yyyy-MM-dd')]?.[habit.id] ? (cur++, best = Math.max(best,cur)) : (cur=0)
       })
       return best
     }
     function rate30(habit, completions, today) {
-      const start = subDays(today, 29)
+      const start = subDays(today,29)
       const created = startOfDay(parseISO(habit.createdAt))
       const from = isBefore(created, start) ? start : created
       const days = eachDayOfInterval({ start: from, end: today })
       const wins = days.filter(d => completions[format(d,'yyyy-MM-dd')]?.[habit.id]).length
-      return days.length ? Math.round(wins / days.length * 100) : 0
+      return days.length ? Math.round(wins/days.length*100) : 0
     }
 
-    // ── useHabits ──────────────────────────────────────────────────────────────
-    function useHabits() {
-      const [data, setData] = useState(load)
-      const today = useMemo(() => startOfDay(new Date()), [])
+    // ── useAuth ────────────────────────────────────────────────────────────────
+    function useAuth() {
+      const [user, setUser]       = useState(null)
+      const [loading, setLoading] = useState(true)
+
+      useEffect(() => {
+        if (!sb) { setLoading(false); return }
+        sb.auth.getSession().then(({ data: { session } }) => {
+          setUser(session?.user ?? null)
+          setLoading(false)
+        })
+        const { data: { subscription } } = sb.auth.onAuthStateChange((_, session) => {
+          setUser(session?.user ?? null)
+        })
+        return () => subscription.unsubscribe()
+      }, [])
+
+      const signIn = useCallback(async (email, password) => {
+        const { error } = await sb.auth.signInWithPassword({ email, password })
+        return error?.message || null
+      }, [])
+
+      const signUp = useCallback(async (email, password) => {
+        const { error } = await sb.auth.signUp({ email, password })
+        return error?.message || null
+      }, [])
+
+      const signOut = useCallback(() => sb.auth.signOut(), [])
+
+      return { user, loading, signIn, signUp, signOut }
+    }
+
+    // ── useHabits (Supabase-backed) ────────────────────────────────────────────
+    function useHabits(user) {
+      const [habits, setHabits]           = useState([])
+      const [completions, setCompletions] = useState({})
+      const [dataLoading, setDataLoading] = useState(true)
+      const today    = useMemo(() => startOfDay(new Date()), [])
       const todayStr = format(today, 'yyyy-MM-dd')
-      const persist = useCallback((d) => { setData(d); save(d) }, [])
 
-      const addHabit = useCallback((f) => {
-        const h = { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, name: f.name.trim(), description: (f.description||'').trim(), reminderTime: f.reminderTime||null, createdAt: todayStr }
-        persist({ ...data, habits: [...data.habits, h] })
-      }, [data, persist, todayStr])
+      // Map DB row → app object
+      const rowToHabit = (h) => ({
+        id:          h.id,
+        name:        h.name,
+        description: h.description || '',
+        reminderTime:h.reminder_time || null,
+        createdAt:   h.created_at,   // 'yyyy-MM-dd' string
+      })
 
-      const updateHabit = useCallback((id, f) => {
-        persist({ ...data, habits: data.habits.map(h => h.id===id ? { ...h, ...f } : h) })
-      }, [data, persist])
+      // Load everything for this user
+      const loadData = useCallback(async () => {
+        if (!user || !sb) return
+        setDataLoading(true)
+        const since = format(subDays(today, 364), 'yyyy-MM-dd')
 
-      const deleteHabit = useCallback((id) => {
-        const c = { ...data.completions }
-        Object.keys(c).forEach(date => { if (c[date]?.[id]) { c[date]={...c[date]}; delete c[date][id] } })
-        persist({ habits: data.habits.filter(h => h.id!==id), completions: c })
-      }, [data, persist])
+        const [{ data: hRows }, { data: cRows }] = await Promise.all([
+          sb.from('habits').select('*').eq('user_id', user.id).order('sort_order').order('created_ts', { ascending: true }),
+          sb.from('completions').select('habit_id, completed_date').eq('user_id', user.id).gte('completed_date', since),
+        ])
 
-      const toggleCompletion = useCallback((id, dateStr) => {
+        setHabits((hRows || []).map(rowToHabit))
+
+        const cMap = {}
+        ;(cRows || []).forEach(c => {
+          if (!cMap[c.completed_date]) cMap[c.completed_date] = {}
+          cMap[c.completed_date][c.habit_id] = true
+        })
+        setCompletions(cMap)
+        setDataLoading(false)
+      }, [user, today])
+
+      useEffect(() => { loadData() }, [loadData])
+
+      const addHabit = useCallback(async (fields) => {
+        const { data, error } = await sb.from('habits').insert({
+          user_id:      user.id,
+          name:         fields.name.trim(),
+          description:  (fields.description || '').trim(),
+          reminder_time:fields.reminderTime || null,
+          sort_order:   habits.length,
+        }).select().single()
+        if (!error && data) setHabits(prev => [...prev, rowToHabit(data)])
+      }, [user, habits.length])
+
+      const updateHabit = useCallback(async (id, fields) => {
+        const { error } = await sb.from('habits').update({
+          name:          fields.name.trim(),
+          description:   (fields.description || '').trim(),
+          reminder_time: fields.reminderTime || null,
+        }).eq('id', id).eq('user_id', user.id)
+        if (!error) setHabits(prev => prev.map(h => h.id===id ? { ...h, ...rowToHabit({ ...h, name:fields.name, description:fields.description||'', reminder_time:fields.reminderTime||null, created_at:h.createdAt }) } : h))
+      }, [user])
+
+      const deleteHabit = useCallback(async (id) => {
+        const { error } = await sb.from('habits').delete().eq('id', id).eq('user_id', user.id)
+        if (!error) {
+          setHabits(prev => prev.filter(h => h.id!==id))
+          setCompletions(prev => {
+            const next = { ...prev }
+            Object.keys(next).forEach(date => { if (next[date]?.[id]) { next[date]={...next[date]}; delete next[date][id] } })
+            return next
+          })
+        }
+      }, [user])
+
+      const toggleCompletion = useCallback(async (habitId, dateStr) => {
         const d = dateStr || todayStr
-        persist({ ...data, completions: { ...data.completions, [d]: { ...data.completions[d], [id]: !data.completions[d]?.[id] } } })
-      }, [data, persist, todayStr])
+        const exists = !!completions[d]?.[habitId]
 
-      const isCompleted = useCallback((id, date) => !!data.completions[date||todayStr]?.[id], [data.completions, todayStr])
+        // Optimistic update
+        setCompletions(prev => ({ ...prev, [d]: { ...prev[d], [habitId]: !exists } }))
 
-      const streaks = useMemo(() => data.habits.reduce((acc, h) => ({
-        ...acc,
-        [h.id]: { current: curStreak(h,data.completions,today), longest: bestStreak(h,data.completions,today), rate: rate30(h,data.completions,today) }
-      }), {}), [data.habits, data.completions, today])
+        if (exists) {
+          const { error } = await sb.from('completions').delete().eq('habit_id', habitId).eq('completed_date', d).eq('user_id', user.id)
+          if (error) setCompletions(prev => ({ ...prev, [d]: { ...prev[d], [habitId]: true } })) // rollback
+        } else {
+          const { error } = await sb.from('completions').insert({ user_id: user.id, habit_id: habitId, completed_date: d })
+          if (error) setCompletions(prev => ({ ...prev, [d]: { ...prev[d], [habitId]: false } })) // rollback
+        }
+      }, [user, completions, todayStr])
 
-      return { habits: data.habits, completions: data.completions, streaks, addHabit, updateHabit, deleteHabit, toggleCompletion, isCompleted, today, todayStr }
+      const isCompleted = useCallback((id, date) => !!completions[date||todayStr]?.[id], [completions, todayStr])
+
+      const streaks = useMemo(() => habits.reduce((acc, h) => ({
+        ...acc, [h.id]: { current: curStreak(h,completions,today), longest: bestStreak(h,completions,today), rate: rate30(h,completions,today) }
+      }), {}), [habits, completions, today])
+
+      return { habits, completions, streaks, addHabit, updateHabit, deleteHabit, toggleCompletion, isCompleted, today, todayStr, dataLoading }
     }
 
     // ── useNotifications ───────────────────────────────────────────────────────
@@ -165,15 +249,158 @@
       return { page, navigate }
     }
 
+    // ── SetupPage ──────────────────────────────────────────────────────────────
+    function SetupPage() {
+      return (
+        <div className="min-h-screen bg-slate-50 dark:bg-[#0d0d12] flex items-center justify-center p-6">
+          <div className="w-full max-w-md animate-fadeUp">
+            <div className="bg-white dark:bg-[#18181f] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-8 space-y-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-xl">⚙️</div>
+                <div>
+                  <h2 className="font-bold text-gray-900 dark:text-white">Setup required</h2>
+                  <p className="text-xs text-gray-500 dark:text-gray-500">Supabase credentials not configured</p>
+                </div>
+              </div>
+              <ol className="space-y-3 text-sm text-gray-600 dark:text-gray-400">
+                <li className="flex gap-3"><span className="w-5 h-5 rounded-full bg-indigo-500 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">1</span><span>Create a free project at <strong className="text-gray-900 dark:text-white">supabase.com</strong></span></li>
+                <li className="flex gap-3"><span className="w-5 h-5 rounded-full bg-indigo-500 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">2</span><span>Run the SQL in <code className="bg-gray-100 dark:bg-white/10 px-1 rounded">supabase-schema.sql</code> in the SQL editor</span></li>
+                <li className="flex gap-3"><span className="w-5 h-5 rounded-full bg-indigo-500 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">3</span><span>Copy your Project URL &amp; anon key from <strong className="text-gray-900 dark:text-white">Settings → API</strong></span></li>
+                <li className="flex gap-3"><span className="w-5 h-5 rounded-full bg-indigo-500 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">4</span><span>Paste them into <code className="bg-gray-100 dark:bg-white/10 px-1 rounded">config.js</code> next to this file</span></li>
+                <li className="flex gap-3"><span className="w-5 h-5 rounded-full bg-indigo-500 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">5</span><span>Reload this page</span></li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    // ── AuthPage ───────────────────────────────────────────────────────────────
+    function AuthPage({ signIn, signUp }) {
+      const [mode, setMode]     = useState('signin')  // 'signin' | 'signup'
+      const [email, setEmail]   = useState('')
+      const [pass, setPass]     = useState('')
+      const [error, setError]   = useState(null)
+      const [busy, setBusy]     = useState(false)
+      const [done, setDone]     = useState(false)     // signup confirmation
+
+      const submit = async (e) => {
+        e.preventDefault()
+        if (!email.trim() || !pass.trim()) return
+        setBusy(true); setError(null)
+        if (mode === 'signin') {
+          const err = await signIn(email.trim(), pass)
+          if (err) { setError(err); setBusy(false) }
+        } else {
+          const err = await signUp(email.trim(), pass)
+          if (err) { setError(err); setBusy(false) }
+          else setDone(true)
+        }
+      }
+
+      if (done) {
+        return (
+          <div className="min-h-screen bg-slate-50 dark:bg-[#0d0d12] flex items-center justify-center p-6">
+            <div className="w-full max-w-sm bg-white dark:bg-[#18181f] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-8 text-center space-y-4 animate-fadeUp">
+              <div className="text-4xl">✉️</div>
+              <h2 className="font-bold text-gray-900 dark:text-white">Check your email</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">We sent a confirmation link to <strong className="text-gray-700 dark:text-gray-300">{email}</strong>. Click it to activate your account, then sign in.</p>
+              <button onClick={() => { setDone(false); setMode('signin') }}
+                className="text-indigo-500 text-sm font-medium hover:underline">Back to sign in</button>
+            </div>
+          </div>
+        )
+      }
+
+      return (
+        <div className="min-h-screen bg-slate-50 dark:bg-[#0d0d12] flex items-center justify-center p-6">
+          <div className="w-full max-w-sm animate-fadeUp">
+            {/* Logo */}
+            <div className="flex flex-col items-center mb-8">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/25 mb-4">
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">Habit Tracker</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
+                {mode === 'signin' ? 'Sign in to your account' : 'Create your account'}
+              </p>
+            </div>
+
+            <div className="bg-white dark:bg-[#18181f] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-6 space-y-4">
+              {/* Mode toggle */}
+              <div className="flex rounded-xl overflow-hidden bg-gray-100 dark:bg-white/[0.06] p-0.5">
+                {[['signin','Sign in'],['signup','Create account']].map(([m,label]) => (
+                  <button key={m} onClick={() => { setMode(m); setError(null) }}
+                    className={`flex-1 py-2 text-xs font-semibold rounded-[10px] transition-all ${mode===m ? 'bg-white dark:bg-[#28282f] text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-500'}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <form onSubmit={submit} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Email</label>
+                  <input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoFocus
+                    placeholder="you@example.com"
+                    className="w-full rounded-xl border border-gray-200 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.04] text-gray-900 dark:text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-400 dark:placeholder-gray-600" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Password</label>
+                  <input type="password" value={pass} onChange={e=>setPass(e.target.value)} required
+                    placeholder="••••••••" minLength={6}
+                    className="w-full rounded-xl border border-gray-200 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.04] text-gray-900 dark:text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-400 dark:placeholder-gray-600" />
+                </div>
+
+                {error && (
+                  <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-xl px-4 py-2.5 text-xs text-red-600 dark:text-red-400">
+                    {error}
+                  </div>
+                )}
+
+                <button type="submit" disabled={busy || !email.trim() || !pass.trim()}
+                  className="w-full py-2.5 rounded-xl bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
+                  {busy && (
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                    </svg>
+                  )}
+                  {mode === 'signin' ? 'Sign in' : 'Create account'}
+                </button>
+              </form>
+
+              {mode === 'signin' && (
+                <p className="text-center text-xs text-gray-400 dark:text-gray-600">
+                  No account?{' '}
+                  <button onClick={() => { setMode('signup'); setError(null) }} className="text-indigo-500 font-medium hover:underline">
+                    Create one free
+                  </button>
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )
+    }
+
     // ── AddEditModal ───────────────────────────────────────────────────────────
     function AddEditModal({ habit, onSave, onClose }) {
       const [form, setForm] = useState({ name: habit?.name||'', description: habit?.description||'', reminderTime: habit?.reminderTime||'' })
+      const [busy, setBusy] = useState(false)
       const set = (k,v) => setForm(f=>({...f,[k]:v}))
-      const submit = (e) => { e.preventDefault(); if (!form.name.trim()) return; onSave({...form, reminderTime: form.reminderTime||null}) }
+      const submit = async (e) => {
+        e.preventDefault()
+        if (!form.name.trim()) return
+        setBusy(true)
+        await onSave({ ...form, reminderTime: form.reminderTime||null })
+        setBusy(false)
+      }
 
       return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={e => e.target===e.currentTarget && onClose()}>
-          <div className="w-full max-w-md bg-white dark:bg-[#18181f] rounded-2xl shadow-2xl p-6 space-y-4 border border-gray-100 dark:border-white/[0.06]">
+          <div className="w-full max-w-md bg-white dark:bg-[#18181f] rounded-2xl shadow-2xl p-6 space-y-4 border border-gray-100 dark:border-white/[0.06] animate-fadeUp">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-semibold text-gray-900 dark:text-white">{habit ? 'Edit Habit' : 'New Habit'}</h2>
               <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 text-gray-400 text-xl leading-none">×</button>
@@ -198,7 +425,9 @@
               </div>
               <div className="flex gap-3 pt-1">
                 <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-white/[0.08] text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">Cancel</button>
-                <button type="submit" disabled={!form.name.trim()} className="flex-1 py-2.5 rounded-xl bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600 disabled:opacity-40 transition-colors">
+                <button type="submit" disabled={busy || !form.name.trim()}
+                  className="flex-1 py-2.5 rounded-xl bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600 disabled:opacity-40 transition-colors flex items-center justify-center gap-2">
+                  {busy && <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>}
                   {habit ? 'Save' : 'Add Habit'}
                 </button>
               </div>
@@ -213,51 +442,34 @@
       const [popping, setPopping] = useState(false)
       const c = col(colorIdx)
       const tap = () => { setPopping(true); onToggle(); setTimeout(()=>setPopping(false),320) }
-
       return (
         <div className="rounded-2xl border border-gray-100 dark:border-white/[0.06] bg-white dark:bg-[#18181f] overflow-hidden flex items-stretch active:scale-[0.985] transition-transform">
-          <div className="w-[3px] flex-shrink-0 transition-colors duration-300" style={{ backgroundColor: completed ? c : 'transparent', borderRight: completed ? 'none' : '3px solid transparent' }} />
+          <div className="w-[3px] flex-shrink-0 transition-colors duration-300" style={{ backgroundColor: completed ? c : 'transparent' }} />
           <div className="flex-1 p-4 flex items-center gap-3.5">
             <button onClick={tap}
               className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 border-2 transition-all duration-200 ${popping ? 'animate-pop' : ''}`}
-              style={completed
-                ? { backgroundColor: c, borderColor: c, color: '#fff', boxShadow: `0 0 16px ${c}55` }
-                : { borderColor: '#d1d5db', color: '#d1d5db' }}
-            >
-              {completed && (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-              )}
+              style={completed ? { backgroundColor: c, borderColor: c, color:'#fff', boxShadow:`0 0 16px ${c}55` } : { borderColor:'#d1d5db', color:'#d1d5db' }}>
+              {completed && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
             </button>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{habit.name}</p>
               {habit.description
                 ? <p className="text-xs text-gray-400 dark:text-gray-600 truncate mt-0.5">{habit.description}</p>
-                : <p className="text-xs mt-0.5 transition-colors" style={{ color: completed ? c : '#9ca3af' }}>
-                    {completed ? 'Done today' : 'Tap to complete'}
-                  </p>
+                : <p className="text-xs mt-0.5" style={{ color: completed ? c : '#9ca3af' }}>{completed ? 'Done today' : 'Tap to complete'}</p>
               }
             </div>
             <div className="text-right flex-shrink-0">
-              {streak.current > 0 ? (
-                <>
-                  <div className="font-bold text-base leading-none" style={{ color: c }}>🔥 {streak.current}</div>
-                  <div className="text-[10px] text-gray-400 dark:text-gray-600 mt-0.5">day streak</div>
-                </>
-              ) : (
-                <>
-                  <div className="font-bold text-base leading-none text-gray-200 dark:text-gray-700">—</div>
-                  <div className="text-[10px] text-gray-400 dark:text-gray-600 mt-0.5">no streak</div>
-                </>
-              )}
+              {streak.current > 0
+                ? <><div className="font-bold text-base leading-none" style={{ color: c }}>🔥 {streak.current}</div><div className="text-[10px] text-gray-400 dark:text-gray-600 mt-0.5">day streak</div></>
+                : <><div className="font-bold text-base leading-none text-gray-200 dark:text-gray-700">—</div><div className="text-[10px] text-gray-400 dark:text-gray-600 mt-0.5">no streak</div></>
+              }
             </div>
           </div>
         </div>
       )
     }
 
-    // ── HabitSelector dropdown ─────────────────────────────────────────────────
+    // ── HabitSelector ──────────────────────────────────────────────────────────
     function HabitSelector({ habits, selectedIds, onToggle, onSelectAll, onClearAll }) {
       const [open, setOpen] = useState(false)
       const ref = useRef(null)
@@ -267,15 +479,12 @@
         document.addEventListener('mousedown', fn)
         return () => document.removeEventListener('mousedown', fn)
       }, [open])
-
       return (
         <div className="relative" ref={ref}>
           <button onClick={() => setOpen(o=>!o)}
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white dark:bg-white/[0.06] border border-gray-200 dark:border-white/[0.08] text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.09] transition-colors">
-            <span>{selectedIds.size === habits.length ? 'All habits' : `${selectedIds.size} / ${habits.length}`}</span>
-            <svg className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
+            <span>{selectedIds.size===habits.length ? 'All habits' : `${selectedIds.size} / ${habits.length}`}</span>
+            <svg className={`w-3.5 h-3.5 transition-transform ${open?'rotate-180':''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>
           </button>
           {open && (
             <div className="absolute top-full right-0 mt-2 z-30 bg-white dark:bg-[#1e1e27] border border-gray-200 dark:border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden min-w-48">
@@ -284,20 +493,16 @@
                 <button onClick={onClearAll} className="flex-1 py-2.5 text-xs font-medium text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5">None</button>
               </div>
               <div className="py-1 max-h-52 overflow-y-auto">
-                {habits.map((h, i) => {
+                {habits.map((h,i) => {
                   const checked = selectedIds.has(h.id)
                   return (
                     <label key={h.id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5">
                       <div className="w-4 h-4 rounded-[4px] border-2 flex items-center justify-center flex-shrink-0 transition-all"
-                        style={checked ? { backgroundColor: col(i), borderColor: col(i) } : { borderColor: '#d1d5db' }}>
-                        {checked && (
-                          <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
+                        style={checked ? { backgroundColor:col(i), borderColor:col(i) } : { borderColor:'#d1d5db' }}>
+                        {checked && <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
                       </div>
                       <input type="checkbox" checked={checked} onChange={() => onToggle(h.id)} className="sr-only" />
-                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: col(i) }} />
+                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor:col(i) }} />
                       <span className="text-sm text-gray-700 dark:text-gray-300 truncate">{h.name}</span>
                     </label>
                   )
@@ -311,85 +516,59 @@
 
     // ── CalendarGrid30 ─────────────────────────────────────────────────────────
     function CalendarGrid30({ habits, completions, today, selectedHabits }) {
-      const days = useMemo(() => eachDayOfInterval({ start: subDays(today,29), end: today }), [today])
-      const CELL = 17, GAP = 2, LW = 120
-
-      // Build month spans for the header
+      const days = useMemo(() => eachDayOfInterval({ start:subDays(today,29), end:today }), [today])
+      const CELL=17, GAP=2, LW=120
       const monthSpans = useMemo(() => {
         const spans = []
-        days.forEach((d, i) => {
-          const m = format(d, 'MMM')
-          if (!spans.length || spans[spans.length-1].label !== m) {
-            spans.push({ label: m, start: i, count: 1 })
-          } else {
-            spans[spans.length-1].count++
-          }
+        days.forEach((d,i) => {
+          const m = format(d,'MMM')
+          if (!spans.length || spans[spans.length-1].label!==m) spans.push({ label:m, count:1 })
+          else spans[spans.length-1].count++
         })
         return spans
       }, [days])
-
-      if (!selectedHabits.length) {
-        return <p className="text-xs text-gray-400 text-center py-6">Select habits to display.</p>
-      }
-
+      if (!selectedHabits.length) return <p className="text-xs text-gray-400 text-center py-6">Select habits to display.</p>
       return (
         <div className="overflow-x-auto">
-          <div style={{ minWidth: LW + 30*(CELL+GAP) }}>
-            {/* Month labels */}
-            <div className="flex items-center mb-0.5" style={{ paddingLeft: LW }}>
-              {monthSpans.map(({ label, count }) => (
-                <div key={label} style={{ width: count*(CELL+GAP)-GAP, marginRight: GAP, fontSize: 8, fontWeight: 700, color: '#6366f1', letterSpacing: '0.06em', flexShrink: 0 }}>
-                  {label.toUpperCase()}
-                </div>
+          <div style={{ minWidth: LW+30*(CELL+GAP) }}>
+            <div className="flex items-center mb-0.5" style={{ paddingLeft:LW }}>
+              {monthSpans.map(({label,count}) => (
+                <div key={label} style={{ width:count*(CELL+GAP)-GAP, marginRight:GAP, fontSize:8, fontWeight:700, color:'#6366f1', letterSpacing:'0.06em', flexShrink:0 }}>{label.toUpperCase()}</div>
               ))}
             </div>
-            {/* Day numbers */}
-            <div className="flex items-center mb-1" style={{ paddingLeft: LW }}>
+            <div className="flex items-center mb-1" style={{ paddingLeft:LW }}>
               {days.map((d,i) => (
-                <div key={i} style={{ width: CELL, marginRight: GAP, textAlign: 'center', fontSize: 8, color: '#6b7280', flexShrink: 0, fontWeight: format(d,'EEEE')==='Sunday'?700:400 }}>
-                  {format(d,'d')}
-                </div>
+                <div key={i} style={{ width:CELL, marginRight:GAP, textAlign:'center', fontSize:8, color:'#6b7280', flexShrink:0, fontWeight:format(d,'EEEE')==='Sunday'?700:400 }}>{format(d,'d')}</div>
               ))}
             </div>
-
-            {/* Habit rows */}
             {selectedHabits.map(h => {
-              const hi = habits.findIndex(hh => hh.id===h.id)
-              const c = col(hi)
+              const hi = habits.findIndex(hh=>hh.id===h.id), c=col(hi)
               return (
-                <div key={h.id} className="flex items-center" style={{ height: CELL+4, marginBottom: GAP }}>
-                  <div style={{ width: LW, paddingRight: 8, flexShrink: 0 }} className="flex items-center gap-2">
-                    <div style={{ width: 6, height: 6, borderRadius:'50%', backgroundColor: c, flexShrink: 0 }} />
-                    <span style={{ fontSize: 10.5, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} className="text-gray-500 dark:text-gray-500">{h.name}</span>
+                <div key={h.id} className="flex items-center" style={{ height:CELL+4, marginBottom:GAP }}>
+                  <div style={{ width:LW, paddingRight:8, flexShrink:0 }} className="flex items-center gap-2">
+                    <div style={{ width:6, height:6, borderRadius:'50%', backgroundColor:c, flexShrink:0 }} />
+                    <span style={{ fontSize:10.5, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} className="text-gray-500 dark:text-gray-500">{h.name}</span>
                   </div>
                   {days.map(d => {
                     const done = !!completions[format(d,'yyyy-MM-dd')]?.[h.id]
-                    return (
-                      <div key={format(d,'yyyy-MM-dd')} title={`${h.name} — ${format(d,'MMM d')} ${done?'✓':'—'}`}
-                        style={{ width: CELL, height: CELL, marginRight: GAP, flexShrink: 0, borderRadius: 3, backgroundColor: done ? c : 'rgba(128,128,128,0.1)' }} />
-                    )
+                    return <div key={format(d,'yyyy-MM-dd')} title={`${h.name} — ${format(d,'MMM d')} ${done?'✓':'—'}`}
+                      style={{ width:CELL, height:CELL, marginRight:GAP, flexShrink:0, borderRadius:3, backgroundColor:done?c:'rgba(128,128,128,0.1)' }} />
                   })}
                 </div>
               )
             })}
-
-            {/* Totals */}
-            <div className="flex items-center" style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(128,128,128,0.12)' }}>
-              <div style={{ width: LW, paddingRight: 8, flexShrink: 0 }}>
-                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em' }} className="text-gray-400 dark:text-gray-600">TOTAL</span>
+            <div className="flex items-center" style={{ marginTop:6, paddingTop:6, borderTop:'1px solid rgba(128,128,128,0.12)' }}>
+              <div style={{ width:LW, paddingRight:8, flexShrink:0 }}>
+                <span style={{ fontSize:9, fontWeight:700, letterSpacing:'0.08em' }} className="text-gray-400 dark:text-gray-600">TOTAL</span>
               </div>
               {days.map(d => {
                 const key = format(d,'yyyy-MM-dd')
-                const total = selectedHabits.filter(h => !!completions[key]?.[h.id]).length
+                const total = selectedHabits.filter(h=>!!completions[key]?.[h.id]).length
                 const pct = selectedHabits.length ? total/selectedHabits.length : 0
                 return (
-                  <div key={key}
-                    style={{ width: CELL, height: CELL, marginRight: GAP, flexShrink: 0, borderRadius: 3,
-                      display:'flex', alignItems:'center', justifyContent:'center',
-                      fontSize: 8, fontWeight: 700,
-                      backgroundColor: total>0 ? `rgba(99,102,241,${0.18+pct*0.7})` : 'rgba(128,128,128,0.1)',
-                      color: total>0 ? '#a5b4fc' : '#9ca3af',
-                    }}>
+                  <div key={key} style={{ width:CELL, height:CELL, marginRight:GAP, flexShrink:0, borderRadius:3, display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700,
+                    backgroundColor: total>0 ? `rgba(99,102,241,${0.18+pct*0.7})` : 'rgba(128,128,128,0.1)',
+                    color: total>0 ? '#a5b4fc' : '#9ca3af' }}>
                     {total>0 ? total : ''}
                   </div>
                 )
@@ -402,95 +581,54 @@
 
     // ── StackedBarChart ────────────────────────────────────────────────────────
     function StackedBarChart({ habits, completions, today, selectedHabits }) {
-      const days = useMemo(() => eachDayOfInterval({ start: subDays(today,29), end: today }), [today])
-      const W = 700, H = 130
-      const PAD = { t: 8, r: 8, b: 26, l: 26 }
-      const iW = W-PAD.l-PAD.r, iH = H-PAD.t-PAD.b
-      const n = Math.max(selectedHabits.length, 1)
-      const slot = iW/30
-      const barW = Math.max(slot*0.68, 5)
-      const segH = iH/n
-
+      const days = useMemo(() => eachDayOfInterval({ start:subDays(today,29), end:today }), [today])
+      const W=700, H=130, PAD={t:8,r:8,b:26,l:26}
+      const iW=W-PAD.l-PAD.r, iH=H-PAD.t-PAD.b
+      const n=Math.max(selectedHabits.length,1), slot=iW/30, barW=Math.max(slot*0.68,5), segH=iH/n
       if (!selectedHabits.length) return null
-
-      const yTicks = n<=4 ? Array.from({length:n+1},(_,i)=>i) : [0, Math.round(n/2), n]
-      const uniqueYTicks = [...new Set(yTicks)]
-
+      const yTicks = n<=4 ? Array.from({length:n+1},(_,i)=>i) : [0,Math.round(n/2),n]
       return (
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ display:'block' }}>
-          {/* Y grid + labels */}
-          {uniqueYTicks.map(v => {
-            const y = PAD.t + (1 - v/n)*iH
-            return (
-              <g key={v}>
-                <line x1={PAD.l} y1={y} x2={W-PAD.r} y2={y} stroke="rgba(128,128,128,0.12)" strokeWidth={1} />
-                <text x={PAD.l-4} y={y+3.5} fontSize={8} fill="#6b7280" textAnchor="end">{v}</text>
-              </g>
-            )
+          {[...new Set(yTicks)].map(v => {
+            const y=PAD.t+(1-v/n)*iH
+            return <g key={v}><line x1={PAD.l} y1={y} x2={W-PAD.r} y2={y} stroke="rgba(128,128,128,0.12)" strokeWidth={1}/><text x={PAD.l-4} y={y+3.5} fontSize={8} fill="#6b7280" textAnchor="end">{v}</text></g>
           })}
-
-          {/* Bars */}
-          {days.map((day, di) => {
-            const key = format(day,'yyyy-MM-dd')
-            const completed = selectedHabits.filter(h => !!completions[key]?.[h.id])
-            let stackY = PAD.t + iH
-            const x = PAD.l + di*slot + (slot-barW)/2
+          {days.map((day,di) => {
+            const key=format(day,'yyyy-MM-dd'), done=selectedHabits.filter(h=>!!completions[key]?.[h.id])
+            let stackY=PAD.t+iH, x=PAD.l+di*slot+(slot-barW)/2
             return (
               <g key={key}>
-                {completed.map(h => {
-                  const hi = habits.findIndex(hh => hh.id===h.id)
-                  stackY -= segH
-                  return (
-                    <rect key={h.id} x={x} y={stackY+0.5} width={barW} height={segH-1}
-                      fill={col(hi)} rx={barW>10?3:2} opacity={0.88} />
-                  )
-                })}
-                {/* Ghost bar */}
-                {completed.length === 0 && (
-                  <rect x={x} y={PAD.t} width={barW} height={iH} fill="rgba(128,128,128,0.05)" rx={barW>10?3:2} />
-                )}
+                {done.map(h => { const hi=habits.findIndex(hh=>hh.id===h.id); stackY-=segH; return <rect key={h.id} x={x} y={stackY+0.5} width={barW} height={segH-1} fill={col(hi)} rx={barW>10?3:2} opacity={0.88}/> })}
+                {done.length===0 && <rect x={x} y={PAD.t} width={barW} height={iH} fill="rgba(128,128,128,0.05)" rx={barW>10?3:2}/>}
               </g>
             )
           })}
-
-          {/* X labels */}
-          {days.map((day, di) => {
+          {days.map((day,di) => {
             if (di!==0 && di%5!==4 && di!==29) return null
-            return (
-              <text key={di} x={PAD.l + di*slot + slot/2} y={H-6}
-                fontSize={8} fill="#6b7280" textAnchor="middle">
-                {format(day,'M/d')}
-              </text>
-            )
+            return <text key={di} x={PAD.l+di*slot+slot/2} y={H-6} fontSize={8} fill="#6b7280" textAnchor="middle">{format(day,'M/d')}</text>
           })}
         </svg>
       )
     }
 
-    // ── Legend ─────────────────────────────────────────────────────────────────
     function ColorLegend({ habits, selectedIds }) {
-      const selected = habits.filter(h => selectedIds.has(h.id))
+      const selected = habits.filter(h=>selectedIds.has(h.id))
       if (!selected.length) return null
       return (
         <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-2">
-          {selected.map(h => {
-            const hi = habits.findIndex(hh => hh.id===h.id)
-            return (
-              <div key={h.id} className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: col(hi) }} />
-                <span className="text-[10px] text-gray-500 dark:text-gray-500 truncate" style={{ maxWidth: 80 }}>{h.name}</span>
-              </div>
-            )
-          })}
+          {selected.map(h => { const hi=habits.findIndex(hh=>hh.id===h.id); return (
+            <div key={h.id} className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor:col(hi) }}/>
+              <span className="text-[10px] text-gray-500 dark:text-gray-500 truncate" style={{ maxWidth:80 }}>{h.name}</span>
+            </div>
+          )})}
         </div>
       )
     }
 
     // ── TodayPage ──────────────────────────────────────────────────────────────
     function TodayPage({ habits, streaks, toggleCompletion, isCompleted, today, requestPermission, navigate }) {
-      const wins = habits.filter(h => isCompleted(h.id)).length
-      const pct = habits.length ? Math.round(wins/habits.length*100) : 0
-
+      const wins=habits.filter(h=>isCompleted(h.id)).length, pct=habits.length?Math.round(wins/habits.length*100):0
       return (
         <div className="py-4 space-y-5">
           <div className="flex items-start justify-between">
@@ -498,42 +636,31 @@
               <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{format(today,'EEEE')}</h2>
               <p className="text-sm text-gray-400 dark:text-gray-600 mt-0.5">{format(today,'MMMM d, yyyy')}</p>
             </div>
-            <button onClick={async () => { const ok=await requestPermission(); if(!ok) alert('Enable notifications in browser settings.') }}
+            <button onClick={async()=>{ const ok=await requestPermission(); if(!ok) alert('Enable notifications in browser settings.') }}
               className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 text-gray-400 transition-colors" title="Enable reminders">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
             </button>
           </div>
-
-          {habits.length > 0 && (
+          {habits.length>0 && (
             <div>
               <div className="flex justify-between text-xs mb-1.5 text-gray-400 dark:text-gray-600">
                 <span>{wins} of {habits.length} completed</span>
                 <span className="font-semibold tabular-nums">{pct}%</span>
               </div>
               <div className="h-1 bg-gray-100 dark:bg-white/[0.06] rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all duration-700"
-                  style={{ width:`${pct}%`, backgroundColor: pct===100?'#10b981':'#6366f1' }} />
+                <div className="h-full rounded-full transition-all duration-700" style={{ width:`${pct}%`, backgroundColor:pct===100?'#10b981':'#6366f1' }}/>
               </div>
             </div>
           )}
-
           <div className="space-y-2">
-            {habits.map((h,i) => (
-              <HabitCard key={h.id} habit={h} colorIdx={i} completed={isCompleted(h.id)}
-                streak={streaks[h.id]||{current:0}} onToggle={()=>toggleCompletion(h.id)} />
-            ))}
+            {habits.map((h,i) => <HabitCard key={h.id} habit={h} colorIdx={i} completed={isCompleted(h.id)} streak={streaks[h.id]||{current:0}} onToggle={()=>toggleCompletion(h.id)} />)}
           </div>
-
-          {habits.length === 0 && (
+          {habits.length===0 && (
             <div className="flex flex-col items-center py-20 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/10 flex items-center justify-center mb-4 text-2xl">🌱</div>
+              <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center mb-4 text-2xl">🌱</div>
               <p className="font-semibold text-gray-700 dark:text-gray-300">No habits yet</p>
               <p className="text-sm text-gray-400 dark:text-gray-600 mt-1 mb-6">Start tracking your daily habits.</p>
-              <button onClick={()=>navigate('manage')} className="px-5 py-2.5 bg-indigo-500 text-white rounded-xl text-sm font-semibold hover:bg-indigo-600 transition-colors">
-                Add your first habit
-              </button>
+              <button onClick={()=>navigate('manage')} className="px-5 py-2.5 bg-indigo-500 text-white rounded-xl text-sm font-semibold hover:bg-indigo-600 transition-colors">Add your first habit</button>
             </div>
           )}
         </div>
@@ -544,90 +671,57 @@
     function AnalyticsPage({ habits, completions, streaks, today }) {
       const [selectedIds, setSelectedIds] = useState(() => new Set(habits.map(h=>h.id)))
       useEffect(() => { setSelectedIds(new Set(habits.map(h=>h.id))) }, [habits.length])
-
-      const toggle = (id) => setSelectedIds(prev => { const s=new Set(prev); s.has(id)?s.delete(id):s.add(id); return s })
-      const selectAll = () => setSelectedIds(new Set(habits.map(h=>h.id)))
-      const clearAll = () => setSelectedIds(new Set())
-      const selectedHabits = habits.filter(h => selectedIds.has(h.id))
-
-      const avgRate = habits.length ? Math.round(habits.reduce((s,h)=>s+(streaks[h.id]?.rate??0),0)/habits.length) : 0
-      const topStreak = habits.length ? Math.max(...habits.map(h=>streaks[h.id]?.longest??0)) : 0
-
-      if (!habits.length) {
-        return (
-          <div className="py-4">
-            <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white mb-6">Analytics</h2>
-            <div className="text-center py-20 text-gray-400">
-              <div className="text-4xl mb-3">📊</div>
-              <p className="font-medium">No data yet</p>
-              <p className="text-sm mt-1 text-gray-400 dark:text-gray-600">Add habits and start tracking.</p>
-            </div>
-          </div>
-        )
-      }
-
+      const toggle=id=>setSelectedIds(prev=>{const s=new Set(prev);s.has(id)?s.delete(id):s.add(id);return s})
+      const selectedHabits=habits.filter(h=>selectedIds.has(h.id))
+      const avgRate=habits.length?Math.round(habits.reduce((s,h)=>s+(streaks[h.id]?.rate??0),0)/habits.length):0
+      const topStreak=habits.length?Math.max(...habits.map(h=>streaks[h.id]?.longest??0)):0
+      if (!habits.length) return (
+        <div className="py-4">
+          <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white mb-6">Analytics</h2>
+          <div className="text-center py-20 text-gray-400"><div className="text-4xl mb-3">📊</div><p className="font-medium">No data yet</p><p className="text-sm mt-1 text-gray-400 dark:text-gray-600">Add habits and start tracking.</p></div>
+        </div>
+      )
       return (
         <div className="py-4 space-y-4">
           <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Analytics</h2>
-
-          {/* Stats row */}
           <div className="grid grid-cols-3 gap-2.5">
-            {[
-              { label: 'Habits', value: habits.length, color: '#6366f1' },
-              { label: 'Avg 30d', value: `${avgRate}%`, color: '#10b981' },
-              { label: 'Best streak', value: `🔥 ${topStreak}`, color: '#f59e0b' },
-            ].map(s => (
+            {[{label:'Habits',value:habits.length,color:'#6366f1'},{label:'Avg 30d',value:`${avgRate}%`,color:'#10b981'},{label:'Best streak',value:`🔥 ${topStreak}`,color:'#f59e0b'}].map(s=>(
               <div key={s.label} className="bg-white dark:bg-[#18181f] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-3.5 text-center">
-                <div className="text-xl font-bold tabular-nums" style={{ color: s.color }}>{s.value}</div>
+                <div className="text-xl font-bold tabular-nums" style={{ color:s.color }}>{s.value}</div>
                 <div className="text-[10px] text-gray-400 dark:text-gray-600 mt-0.5 uppercase tracking-wide">{s.label}</div>
               </div>
             ))}
           </div>
-
-          {/* Main chart card */}
           <div className="bg-white dark:bg-[#18181f] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-5 space-y-5">
-            {/* Header + selector */}
             <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="font-semibold text-gray-900 dark:text-white text-sm">30-Day Overview</h3>
-                <p className="text-[11px] text-gray-400 dark:text-gray-600 mt-0.5">Last 30 days completion grid</p>
-              </div>
-              <HabitSelector habits={habits} selectedIds={selectedIds} onToggle={toggle} onSelectAll={selectAll} onClearAll={clearAll} />
+              <div><h3 className="font-semibold text-gray-900 dark:text-white text-sm">30-Day Overview</h3><p className="text-[11px] text-gray-400 dark:text-gray-600 mt-0.5">Last 30 days completion grid</p></div>
+              <HabitSelector habits={habits} selectedIds={selectedIds} onToggle={toggle} onSelectAll={()=>setSelectedIds(new Set(habits.map(h=>h.id)))} onClearAll={()=>setSelectedIds(new Set())} />
             </div>
-
-            {/* Calendar grid */}
             <CalendarGrid30 habits={habits} completions={completions} today={today} selectedHabits={selectedHabits} />
-
-            {/* Divider */}
             <div className="border-t border-gray-100 dark:border-white/[0.05] pt-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-semibold text-gray-400 dark:text-gray-600 uppercase tracking-wider">Daily stacked completions</h3>
-              </div>
+              <h3 className="text-xs font-semibold text-gray-400 dark:text-gray-600 uppercase tracking-wider mb-3">Daily stacked completions</h3>
               <StackedBarChart habits={habits} completions={completions} today={today} selectedHabits={selectedHabits} />
               <ColorLegend habits={habits} selectedIds={selectedIds} />
             </div>
           </div>
-
-          {/* Per-habit breakdown */}
           <div className="space-y-2">
-            {habits.map((h,i) => {
-              const s = streaks[h.id]||{current:0,longest:0,rate:0}
-              const c = col(i)
+            {habits.map((h,i)=>{
+              const s=streaks[h.id]||{current:0,longest:0,rate:0}, c=col(i)
               return (
                 <div key={h.id} className="bg-white dark:bg-[#18181f] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 overflow-hidden flex">
-                  <div className="w-[3px] flex-shrink-0 rounded-full mr-4" style={{ backgroundColor: c }} />
+                  <div className="w-[3px] flex-shrink-0 rounded-full mr-4" style={{ backgroundColor:c }}/>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <span className="font-semibold text-gray-900 dark:text-white text-sm truncate">{h.name}</span>
-                      <span className="text-sm font-bold flex-shrink-0 tabular-nums" style={{ color: c }}>🔥 {s.current}d</span>
+                      <span className="text-sm font-bold flex-shrink-0 tabular-nums" style={{ color:c }}>🔥 {s.current}d</span>
                     </div>
                     <div className="flex gap-4 text-xs text-gray-400 dark:text-gray-600 mb-2">
                       <span>Current: <strong className="text-gray-600 dark:text-gray-400 tabular-nums">{s.current}d</strong></span>
                       <span>Best: <strong className="text-gray-600 dark:text-gray-400 tabular-nums">{s.longest}d</strong></span>
-                      <span>Rate: <strong className="tabular-nums" style={{ color: c }}>{s.rate}%</strong></span>
+                      <span>Rate: <strong className="tabular-nums" style={{ color:c }}>{s.rate}%</strong></span>
                     </div>
                     <div className="h-1 bg-gray-100 dark:bg-white/[0.06] rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width:`${s.rate}%`, backgroundColor: c }} />
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width:`${s.rate}%`, backgroundColor:c }}/>
                     </div>
                   </div>
                 </div>
@@ -640,19 +734,15 @@
 
     // ── ManagePage ─────────────────────────────────────────────────────────────
     function ManagePage({ habits, streaks, addHabit, updateHabit, deleteHabit }) {
-      const [modal, setModal] = useState(null)
+      const [modal, setModal]       = useState(null)
       const [confirmDel, setConfirmDel] = useState(null)
-      const save = (f) => { if (!modal||modal==='new') addHabit(f); else updateHabit(modal.id,f); setModal(null) }
-
+      const save = async (f) => { if(!modal||modal==='new') await addHabit(f); else await updateHabit(modal.id,f); setModal(null) }
       return (
         <div className="py-4 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Manage</h2>
-            <button onClick={()=>setModal('new')} className="flex items-center gap-1.5 px-4 py-2 bg-indigo-500 text-white rounded-xl text-sm font-semibold hover:bg-indigo-600 transition-colors">
-              + New
-            </button>
+            <button onClick={()=>setModal('new')} className="flex items-center gap-1.5 px-4 py-2 bg-indigo-500 text-white rounded-xl text-sm font-semibold hover:bg-indigo-600 transition-colors">+ New</button>
           </div>
-
           {habits.length===0 ? (
             <div className="text-center py-20 text-gray-400">
               <div className="text-4xl mb-3">📝</div>
@@ -661,33 +751,28 @@
             </div>
           ) : (
             <div className="space-y-2">
-              {habits.map((h,i) => {
-                const s = streaks[h.id]||{current:0,longest:0,rate:0}
-                const c = col(i)
+              {habits.map((h,i)=>{
+                const s=streaks[h.id]||{current:0,longest:0,rate:0}, c=col(i)
                 return (
                   <div key={h.id} className="bg-white dark:bg-[#18181f] rounded-2xl border border-gray-100 dark:border-white/[0.06] overflow-hidden flex items-stretch">
-                    <div className="w-[3px] flex-shrink-0" style={{ backgroundColor: c }} />
+                    <div className="w-[3px] flex-shrink-0" style={{ backgroundColor:c }}/>
                     <div className="flex-1 p-4 flex items-center gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{h.name}</p>
                         {h.description && <p className="text-xs text-gray-400 dark:text-gray-600 truncate mt-0.5">{h.description}</p>}
                         <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                          <span className="text-xs font-semibold tabular-nums" style={{ color: c }}>🔥 {s.current}d</span>
+                          <span className="text-xs font-semibold tabular-nums" style={{ color:c }}>🔥 {s.current}d</span>
                           <span className="text-xs text-gray-400 dark:text-gray-600 tabular-nums">Best {s.longest}d</span>
-                          <span className="text-xs tabular-nums" style={{ color: c }}>{s.rate}%</span>
+                          <span className="text-xs tabular-nums" style={{ color:c }}>{s.rate}%</span>
                           {h.reminderTime && <span className="text-xs text-gray-400 dark:text-gray-600">⏰ {h.reminderTime}</span>}
                         </div>
                       </div>
                       <div className="flex gap-1 flex-shrink-0">
                         <button onClick={()=>setModal(h)} className="w-8 h-8 rounded-lg hover:bg-gray-50 dark:hover:bg-white/5 flex items-center justify-center transition-colors">
-                          <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
+                          <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                         </button>
                         <button onClick={()=>setConfirmDel(h)} className="w-8 h-8 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 flex items-center justify-center transition-colors">
-                          <svg className="w-3.5 h-3.5 text-gray-400 hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
+                          <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                         </button>
                       </div>
                     </div>
@@ -696,23 +781,31 @@
               })}
             </div>
           )}
-
-          {modal && <AddEditModal habit={modal==='new'?null:modal} onSave={save} onClose={()=>setModal(null)} />}
-
+          {modal && <AddEditModal habit={modal==='new'?null:modal} onSave={save} onClose={()=>setModal(null)}/>}
           {confirmDel && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-              <div className="w-full max-w-sm bg-white dark:bg-[#18181f] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-6 space-y-4">
+              <div className="w-full max-w-sm bg-white dark:bg-[#18181f] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-6 space-y-4 animate-fadeUp">
                 <h3 className="font-bold text-gray-900 dark:text-white">Delete habit?</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  <strong className="text-gray-700 dark:text-gray-300">{confirmDel.name}</strong> and all its history will be permanently deleted.
-                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400"><strong className="text-gray-700 dark:text-gray-300">{confirmDel.name}</strong> and all its history will be permanently deleted.</p>
                 <div className="flex gap-3">
                   <button onClick={()=>setConfirmDel(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-white/[0.08] text-sm font-medium text-gray-600 dark:text-gray-400">Cancel</button>
-                  <button onClick={()=>{deleteHabit(confirmDel.id);setConfirmDel(null)}} className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600">Delete</button>
+                  <button onClick={async()=>{await deleteHabit(confirmDel.id);setConfirmDel(null)}} className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600">Delete</button>
                 </div>
               </div>
             </div>
           )}
+        </div>
+      )
+    }
+
+    // ── Spinner ────────────────────────────────────────────────────────────────
+    function Spinner() {
+      return (
+        <div className="min-h-screen bg-slate-50 dark:bg-[#0d0d12] flex items-center justify-center">
+          <svg className="w-8 h-8 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+          </svg>
         </div>
       )
     }
@@ -728,54 +821,73 @@
         localStorage.setItem('habit_dark_mode', dark)
       }, [dark])
 
+      const { user, loading: authLoading, signIn, signUp, signOut } = useAuth()
       const { page, navigate } = useRouter()
-      const data = useHabits()
+      const data = useHabits(user)
       const { requestPermission } = useNotifications(data.habits)
 
+      if (!isConfigured) return <SetupPage />
+      if (authLoading) return <Spinner />
+      if (!user) return <AuthPage signIn={signIn} signUp={signUp} />
+
       const TABS = [
-        { key:'today', label:'Today', icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg> },
-        { key:'analytics', label:'Analytics', icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg> },
-        { key:'manage', label:'Manage', icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg> },
+        { key:'today',     label:'Today',     icon:<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg> },
+        { key:'analytics', label:'Analytics', icon:<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg> },
+        { key:'manage',    label:'Manage',    icon:<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg> },
       ]
 
       return (
         <div className="min-h-screen bg-slate-50 dark:bg-[#0d0d12] transition-colors duration-200">
-          {/* Header */}
           <header className="sticky top-0 z-10 bg-white/75 dark:bg-[#0d0d12]/80 backdrop-blur-xl border-b border-gray-100 dark:border-white/[0.05] px-5 py-3.5 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-7 h-7 rounded-lg bg-indigo-500 flex items-center justify-center">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                </svg>
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>
               </div>
               <span className="font-bold text-gray-900 dark:text-white tracking-tight">Habit Tracker</span>
             </div>
-            <button onClick={()=>setDark(d=>!d)} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
-              {dark
-                ? <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-                : <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
-              }
-            </button>
+            <div className="flex items-center gap-2">
+              {/* User email */}
+              <span className="text-xs text-gray-400 dark:text-gray-600 hidden sm:block truncate max-w-32">{user.email}</span>
+              {/* Dark mode */}
+              <button onClick={()=>setDark(d=>!d)} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
+                {dark
+                  ? <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                  : <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                }
+              </button>
+              {/* Sign out */}
+              <button onClick={signOut} title="Sign out"
+                className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 transition-colors text-gray-400">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+              </button>
+            </div>
           </header>
 
           <main className="max-w-xl mx-auto px-4 pb-24">
-            {page==='today' && <TodayPage {...data} requestPermission={requestPermission} navigate={navigate} />}
-            {page==='analytics' && <AnalyticsPage {...data} />}
-            {page==='manage' && <ManagePage {...data} />}
+            {data.dataLoading ? (
+              <div className="flex items-center justify-center py-24">
+                <svg className="w-6 h-6 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                </svg>
+              </div>
+            ) : (
+              <>
+                {page==='today'     && <TodayPage     {...data} requestPermission={requestPermission} navigate={navigate} />}
+                {page==='analytics' && <AnalyticsPage {...data} />}
+                {page==='manage'    && <ManagePage    {...data} />}
+              </>
+            )}
           </main>
 
-          {/* Bottom nav */}
-          <nav className="fixed bottom-0 left-0 right-0 z-10 bg-white/80 dark:bg-[#0d0d12]/90 backdrop-blur-xl border-t border-gray-100 dark:border-white/[0.05] flex" style={{ paddingBottom: 'env(safe-area-inset-bottom,0)' }}>
-            {TABS.map(({ key, label, icon }) => {
-              const active = page===key
-              return (
-                <button key={key} onClick={()=>navigate(key)}
-                  className={`flex-1 py-3.5 flex flex-col items-center gap-1 text-[11px] font-medium transition-colors ${active ? 'text-indigo-500 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-600'}`}>
-                  <div className={`transition-transform ${active ? 'scale-110' : ''}`}>{icon}</div>
-                  {label}
-                </button>
-              )
-            })}
+          <nav className="fixed bottom-0 left-0 right-0 z-10 bg-white/80 dark:bg-[#0d0d12]/90 backdrop-blur-xl border-t border-gray-100 dark:border-white/[0.05] flex" style={{ paddingBottom:'env(safe-area-inset-bottom,0)' }}>
+            {TABS.map(({key,label,icon}) => (
+              <button key={key} onClick={()=>navigate(key)}
+                className={`flex-1 py-3.5 flex flex-col items-center gap-1 text-[11px] font-medium transition-colors ${page===key ? 'text-indigo-500 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-600'}`}>
+                <div className={`transition-transform ${page===key?'scale-110':''}`}>{icon}</div>
+                {label}
+              </button>
+            ))}
           </nav>
         </div>
       )
